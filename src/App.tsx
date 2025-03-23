@@ -2,42 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import "./index.css";
-import { flattenJSON } from "three/src/animation/AnimationUtils.js";
 import { WallCreator } from "./classes/Wall";
-
-interface Wall {
-  id: string;
-  x: number;
-  y: number;
-  z: number;
-  rotation: number;
-  texture: string;
-  normal: THREE.Vector3;
-}
-
-interface Floor {
-  id: string;
-  width: number;
-  length: number;
-  texture: string;
-  rotation: number;
-  y: number;
-  z: number;
-  x: number;
-}
-
-interface Texture {
-  name: string;
-  path: string;
-  type: "wall" | "floor";
-}
-
-interface SelectedObject {
-  id: string;
-  type: "wall" | "floor";
-  position: { x: number; y: number; z: number };
-  texture: string;
-}
+import { Floor, SelectedObject, Texture, Wall } from "./types/editor";
+import { WireframeWall, WireframeWallCreator } from "./classes/WireFrameWall";
 
 const wallArray: Wall[] = [
   // Front wall
@@ -330,10 +297,7 @@ const BasicScene: React.FC = () => {
             z: intersection.z,
           };
 
-          const newWall = new WallCreator({
-            texture: wallTextures.get("brickWall") as THREE.Texture,
-            roughness: 0.7,
-            metalness: 0.2,
+          const wireFrameWall = new WireframeWall({
             x: Number(intersection.x.toFixed(2)),
             y: 0,
             z: Number(intersection.z.toFixed(2)),
@@ -346,7 +310,7 @@ const BasicScene: React.FC = () => {
             userData: { id: "wall-new", type: "wall", texture: "brickWall" },
           });
 
-          scene.add(newWall.getWallMesh());
+          scene.add(wireFrameWall.getWallMesh());
 
           console.log("CLICK CO ORDS", clickCoordinates);
 
