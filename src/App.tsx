@@ -63,6 +63,7 @@ const FloorPlanEditor: React.FC = () => {
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
   );
+  const [rooms, setRooms] = useState<number[]>([]);
   const [tempWall, setTempWall] = useState<Wall | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
@@ -654,6 +655,7 @@ const FloorPlanEditor: React.FC = () => {
           >
             Delete
           </button>
+          <button>Add to room</button>
         </div>
       )}
     </div>

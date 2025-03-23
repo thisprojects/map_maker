@@ -6,6 +6,7 @@ export interface Wall {
   x2: number;
   y2: number;
   texture: string;
+  roomId?: number;
 }
 
 export interface Floor {
@@ -15,6 +16,7 @@ export interface Floor {
   width: number;
   height: number;
   texture: string;
+  roomId?: number;
 }
 
 export interface SelectedObject {
