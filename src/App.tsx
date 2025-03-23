@@ -1,38 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
-
-// Types
-interface Wall {
-  id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  texture: string;
-}
-
-interface Floor {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  texture: string;
-}
-
-interface SelectedObject {
-  id: string;
-  type: "wall" | "floor";
-  texture: string;
-  position?: {
-    x: number;
-    y: number;
-  };
-  clickPoint?: {
-    x: number;
-    y: number;
-  };
-}
+import { Floor, SelectedObject, Wall } from "./types/editor";
 
 // Grid settings
 const GRID_SIZE = 20; // Size of each grid cell
@@ -100,13 +68,17 @@ const FloorPlanEditor: React.FC = () => {
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
     null
   );
-  const [mode, setMode] = useState<"select" | "addWall">("select");
+  const [mode, setMode] = useState<"select" | "addWall" | "addFloor">("select");
   const [showGrid, setShowGrid] = useState(true);
+  const [tempFloor, setTempFloor] = useState<Floor | null>(null);
+  const [isDrawingFloor, setIsDrawingFloor] = useState(false);
 
   // Map for textures - in a real app, we'd load image patterns
   const textureColors = {
     brickWall: "#a52a2a",
     concreteFloor: "#cccccc",
+    woodFloor: "#d2b48c",
+    tileFloor: "#add8e6",
   };
 
   // Function to snap point to grid
@@ -192,6 +164,13 @@ const FloorPlanEditor: React.FC = () => {
         ctx.strokeStyle = "#000";
         ctx.lineWidth = 1;
         ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
+
+        // If selected, highlight with a different color
+        if (selectedObject && selectedObject.id === floor.id) {
+          ctx.strokeStyle = "#ffcc00";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
+        }
       });
 
       // Draw walls
@@ -223,6 +202,27 @@ const FloorPlanEditor: React.FC = () => {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+
+      // Draw temporary floor when in addFloor mode
+      if (tempFloor) {
+        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
+        ctx.fillRect(
+          tempFloor.x,
+          tempFloor.y,
+          tempFloor.width,
+          tempFloor.height
+        );
+        ctx.strokeStyle = "#0088ff";
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          tempFloor.x,
+          tempFloor.y,
+          tempFloor.width,
+          tempFloor.height
+        );
+        ctx.setLineDash([]);
+      }
     };
 
     // Initial draw
@@ -246,7 +246,7 @@ const FloorPlanEditor: React.FC = () => {
     return () => {
       window.removeEventListener("resize", handleResize);
     };
-  }, [walls, floors, selectedObject, tempWall, showGrid]);
+  }, [walls, floors, selectedObject, tempWall, showGrid, tempFloor]);
 
   // Handle mouse events
   useEffect(() => {
@@ -332,7 +332,24 @@ const FloorPlanEditor: React.FC = () => {
         }
       } else if (mode === "addWall") {
         if (!isDrawingWall) {
-          // Start drawing a wall
+          const escapeKeyHandler = (event: KeyboardEvent) => {
+            if (
+              event.key === "Escape" ||
+              event.key === "Esc" ||
+              event.keyCode === 27
+            ) {
+              setIsDrawingWall(false);
+              setTempWall(null);
+              setStartPoint(null);
+              console.log("Escape key was pressed!");
+
+              document.removeEventListener("keydown", escapeKeyHandler);
+              console.log("Event listener removed");
+            }
+          };
+
+          document.addEventListener("keydown", escapeKeyHandler);
+
           setIsDrawingWall(true);
           setStartPoint({ x, y });
           setTempWall({
@@ -370,15 +387,67 @@ const FloorPlanEditor: React.FC = () => {
           setTempWall(null);
           setStartPoint(null);
         }
+      } else if (mode === "addFloor") {
+        if (!isDrawingFloor) {
+          // Setup escape key handler for canceling floor creation
+          const escapeKeyHandler = (event: KeyboardEvent) => {
+            if (
+              event.key === "Escape" ||
+              event.key === "Esc" ||
+              event.keyCode === 27
+            ) {
+              setIsDrawingFloor(false);
+              setTempFloor(null);
+              setStartPoint(null);
+              console.log("Escape key was pressed - floor creation canceled");
+              document.removeEventListener("keydown", escapeKeyHandler);
+            }
+          };
+
+          document.addEventListener("keydown", escapeKeyHandler);
+
+          // Start drawing floor
+          setIsDrawingFloor(true);
+          setStartPoint({ x, y });
+          setTempFloor({
+            id: "temp-floor",
+            x,
+            y,
+            width: 0,
+            height: 0,
+            texture: "concreteFloor",
+          });
+        } else {
+          // Finish drawing the floor
+          setIsDrawingFloor(false);
+
+          if (tempFloor && startPoint) {
+            // Only add floor if it has some minimum size
+            if (tempFloor.width > 20 && tempFloor.height > 20) {
+              const newFloor: Floor = {
+                id: `floor-${Date.now()}`,
+                x: tempFloor.x,
+                y: tempFloor.y,
+                width: tempFloor.width,
+                height: tempFloor.height,
+                texture: "concreteFloor",
+              };
+              setFloors([...floors, newFloor]);
+            }
+          }
+
+          setTempFloor(null);
+          setStartPoint(null);
+        }
       }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (mode === "addWall" && isDrawingWall && startPoint) {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
+      if (mode === "addWall" && isDrawingWall && startPoint) {
         // Get the snapped and angle-enforced end point
         const endPoint = enforceAngle(
           startPoint.x,
@@ -395,6 +464,27 @@ const FloorPlanEditor: React.FC = () => {
           y2: endPoint.y,
           texture: "brickWall",
         });
+      } else if (mode === "addFloor" && isDrawingFloor && startPoint) {
+        // Snap mouse coordinates to grid
+        const { x, y } = snapToGrid(mouseX, mouseY);
+
+        // Calculate width and height (ensure they're positive)
+        const width = Math.abs(x - startPoint.x);
+        const height = Math.abs(y - startPoint.y);
+
+        // Calculate the top-left corner of the rectangle
+        const floorX = Math.min(startPoint.x, x);
+        const floorY = Math.min(startPoint.y, y);
+
+        // Update temp floor
+        setTempFloor({
+          id: "temp-floor",
+          x: floorX,
+          y: floorY,
+          width,
+          height,
+          texture: "concreteFloor",
+        });
       }
     };
 
@@ -405,13 +495,26 @@ const FloorPlanEditor: React.FC = () => {
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [walls, floors, mode, isDrawingWall, startPoint, tempWall]);
+  }, [
+    walls,
+    floors,
+    mode,
+    isDrawingWall,
+    isDrawingFloor,
+    startPoint,
+    tempWall,
+    tempFloor,
+  ]);
 
-  const toggleMode = () => {
-    setMode(mode === "select" ? "addWall" : "select");
-    // Reset drawing state when switching modes
+  const setModeAndResetDrawing = (
+    newMode: "select" | "addWall" | "addFloor"
+  ) => {
+    setMode(newMode);
+    // Reset all drawing states when switching modes
     setIsDrawingWall(false);
+    setIsDrawingFloor(false);
     setTempWall(null);
+    setTempFloor(null);
     setStartPoint(null);
   };
 
@@ -419,16 +522,48 @@ const FloorPlanEditor: React.FC = () => {
     setShowGrid(!showGrid);
   };
 
+  // Function to change floor texture
+  const changeFloorTexture = (floorId: string, newTexture: string) => {
+    setFloors(
+      floors.map((floor) =>
+        floor.id === floorId ? { ...floor, texture: newTexture } : floor
+      )
+    );
+  };
+
+  // Available floor textures
+  const floorTextures = ["concreteFloor", "woodFloor", "tileFloor"];
+
   return (
     <div className="relative">
       <canvas ref={canvasRef} style={{ width: "100%", height: "100vh" }} />
 
       <div className="absolute top-10 left-10 flex gap-2">
         <button
-          onClick={toggleMode}
-          className="text-black border border-white rounded p-2 cursor-pointer bg-white"
+          onClick={() => setModeAndResetDrawing("select")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "select" ? "bg-blue-200" : "bg-white"
+          }`}
         >
-          {mode === "select" ? "Add Wall Mode" : "Select Mode"}
+          Select Mode
+        </button>
+
+        <button
+          onClick={() => setModeAndResetDrawing("addWall")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "addWall" ? "bg-blue-200" : "bg-white"
+          }`}
+        >
+          Add Wall
+        </button>
+
+        <button
+          onClick={() => setModeAndResetDrawing("addFloor")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "addFloor" ? "bg-blue-200" : "bg-white"
+          }`}
+        >
+          Add Floor
         </button>
 
         <button
@@ -437,13 +572,19 @@ const FloorPlanEditor: React.FC = () => {
         >
           {showGrid ? "Hide Grid" : "Show Grid"}
         </button>
-
-        {isDrawingWall && (
-          <div className="text-white bg-black bg-opacity-70 p-2 rounded">
-            Click to place the end of the wall (45° angles only)
-          </div>
-        )}
       </div>
+
+      {isDrawingWall && (
+        <div className="absolute top-24 left-10 text-white bg-black bg-opacity-70 p-2 rounded">
+          Click to place the end of the wall (45° angles only)
+        </div>
+      )}
+
+      {isDrawingFloor && (
+        <div className="absolute top-24 left-10 text-white bg-black bg-opacity-70 p-2 rounded">
+          Click and drag to set floor dimensions
+        </div>
+      )}
 
       {selectedObject && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-70 text-white p-4 m-4 rounded">
@@ -464,13 +605,51 @@ const FloorPlanEditor: React.FC = () => {
           <p>
             <strong>Texture:</strong> {selectedObject.texture}
           </p>
+
+          {/* Texture selection for floors */}
+          {selectedObject.type === "floor" && (
+            <div className="mt-2">
+              <p>
+                <strong>Change Texture:</strong>
+              </p>
+              <div className="flex gap-2 mt-2">
+                {floorTextures.map((texture) => (
+                  <div
+                    key={texture}
+                    onClick={() =>
+                      changeFloorTexture(selectedObject.id, texture)
+                    }
+                    className="w-8 h-8 cursor-pointer border border-white"
+                    style={{
+                      backgroundColor:
+                        textureColors[texture as keyof typeof textureColors],
+                      outline:
+                        selectedObject.texture === texture
+                          ? "2px solid yellow"
+                          : "none",
+                    }}
+                    title={texture}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
-            className="bg-white text-black p-2 rounded"
+            className="bg-white text-black p-2 rounded mt-4"
             onClick={() => {
-              const newWalls = walls.filter(
-                (wall) => wall.id !== selectedObject.id
-              );
-              setWalls(newWalls);
+              if (selectedObject.type === "wall") {
+                const newWalls = walls.filter(
+                  (wall) => wall.id !== selectedObject.id
+                );
+                setWalls(newWalls);
+              } else if (selectedObject.type === "floor") {
+                const newFloors = floors.filter(
+                  (floor) => floor.id !== selectedObject.id
+                );
+                setFloors(newFloors);
+              }
+              setSelectedObject(null);
             }}
           >
             Delete

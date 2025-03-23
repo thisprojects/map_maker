@@ -1,35 +1,32 @@
-import * as THREE from "three";
-
+// Types
 export interface Wall {
   id: string;
-  x: number;
-  y: number;
-  z: number;
-  rotation: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
   texture: string;
-  normal: THREE.Vector3;
 }
 
 export interface Floor {
   id: string;
-  width: number;
-  length: number;
-  texture: string;
-  rotation: number;
-  y: number;
-  z: number;
   x: number;
-}
-
-export interface Texture {
-  name: string;
-  path: string;
-  type: "wall" | "floor";
+  y: number;
+  width: number;
+  height: number;
+  texture: string;
 }
 
 export interface SelectedObject {
   id: string;
   type: "wall" | "floor";
-  position: { x: number; y: number; z: number };
   texture: string;
+  position?: {
+    x: number;
+    y: number;
+  };
+  clickPoint?: {
+    x: number;
+    y: number;
+  };
 }
