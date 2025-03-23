@@ -34,6 +34,9 @@ interface SelectedObject {
   };
 }
 
+// Grid settings
+const GRID_SIZE = 20; // Size of each grid cell
+
 // Initial data
 const wallArray: Wall[] = [
   // Top wall
@@ -98,11 +101,46 @@ const FloorPlanEditor: React.FC = () => {
     null
   );
   const [mode, setMode] = useState<"select" | "addWall">("select");
+  const [showGrid, setShowGrid] = useState(true);
 
   // Map for textures - in a real app, we'd load image patterns
   const textureColors = {
     brickWall: "#a52a2a",
     concreteFloor: "#cccccc",
+  };
+
+  // Function to snap point to grid
+  const snapToGrid = (x: number, y: number) => {
+    return {
+      x: Math.round(x / GRID_SIZE) * GRID_SIZE,
+      y: Math.round(y / GRID_SIZE) * GRID_SIZE,
+    };
+  };
+
+  // Function to enforce 45-degree angles for walls
+  const enforceAngle = (x1: number, y1: number, x2: number, y2: number) => {
+    const dx = x2 - x1;
+    const dy = y1 - y2; // Note: y is inverted in canvas (0 is at top)
+    const length = Math.sqrt(dx * dx + dy * dy);
+
+    // Calculate angle (in radians) - note we're using arctangent
+    let angle = Math.atan2(dy, dx);
+
+    // Normalize angle to [0, 2π]
+    if (angle < 0) {
+      angle += 2 * Math.PI;
+    }
+
+    // Snap to nearest 45 degrees (π/4)
+    const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+
+    // Calculate new end coordinates
+    // Remember to invert y again for canvas coordinates
+    const newX = x1 + length * Math.cos(snapAngle);
+    const newY = y1 - length * Math.sin(snapAngle);
+
+    // Snap to grid
+    return snapToGrid(newX, newY);
   };
 
   // Initialize canvas
@@ -121,6 +159,28 @@ const FloorPlanEditor: React.FC = () => {
     const draw = () => {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw grid if enabled
+      if (showGrid) {
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.lineWidth = 0.5;
+
+        // Draw vertical grid lines
+        for (let x = 0; x < canvas.width; x += GRID_SIZE) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+
+        // Draw horizontal grid lines
+        for (let y = 0; y < canvas.height; y += GRID_SIZE) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+      }
 
       // Draw floors
       floors.forEach((floor) => {
@@ -186,7 +246,7 @@ const FloorPlanEditor: React.FC = () => {
     return () => {
       window.removeEventListener("resize", handleResize);
     };
-  }, [walls, floors, selectedObject, tempWall]);
+  }, [walls, floors, selectedObject, tempWall, showGrid]);
 
   // Handle mouse events
   useEffect(() => {
@@ -227,20 +287,23 @@ const FloorPlanEditor: React.FC = () => {
 
     const handleMouseDown = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Snap coordinates to grid
+      const { x, y } = snapToGrid(mouseX, mouseY);
 
       if (mode === "select") {
         // Check if we clicked on a wall
         let clickedObject = false;
 
         for (const wall of walls) {
-          if (isPointOnWall(x, y, wall)) {
+          if (isPointOnWall(mouseX, mouseY, wall)) {
             setSelectedObject({
               id: wall.id,
               type: "wall",
               texture: wall.texture,
-              clickPoint: { x, y },
+              clickPoint: { x: mouseX, y: mouseY },
             });
             clickedObject = true;
             break;
@@ -250,12 +313,12 @@ const FloorPlanEditor: React.FC = () => {
         // If not on a wall, check floors
         if (!clickedObject) {
           for (const floor of floors) {
-            if (isPointOnFloor(x, y, floor)) {
+            if (isPointOnFloor(mouseX, mouseY, floor)) {
               setSelectedObject({
                 id: floor.id,
                 type: "floor",
                 texture: floor.texture,
-                clickPoint: { x, y },
+                clickPoint: { x: mouseX, y: mouseY },
               });
               clickedObject = true;
               break;
@@ -296,8 +359,8 @@ const FloorPlanEditor: React.FC = () => {
                 id: `wall-${Date.now()}`,
                 x1: startPoint.x,
                 y1: startPoint.y,
-                x2: x,
-                y2: y,
+                x2: tempWall.x2,
+                y2: tempWall.y2,
                 texture: "brickWall",
               };
               setWalls([...walls, newWall]);
@@ -313,15 +376,23 @@ const FloorPlanEditor: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       if (mode === "addWall" && isDrawingWall && startPoint) {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Get the snapped and angle-enforced end point
+        const endPoint = enforceAngle(
+          startPoint.x,
+          startPoint.y,
+          mouseX,
+          mouseY
+        );
 
         setTempWall({
           id: "temp-wall",
           x1: startPoint.x,
           y1: startPoint.y,
-          x2: x,
-          y2: y,
+          x2: endPoint.x,
+          y2: endPoint.y,
           texture: "brickWall",
         });
       }
@@ -344,6 +415,10 @@ const FloorPlanEditor: React.FC = () => {
     setStartPoint(null);
   };
 
+  const toggleGrid = () => {
+    setShowGrid(!showGrid);
+  };
+
   return (
     <div className="relative">
       <canvas ref={canvasRef} style={{ width: "100%", height: "100vh" }} />
@@ -356,14 +431,20 @@ const FloorPlanEditor: React.FC = () => {
           {mode === "select" ? "Add Wall Mode" : "Select Mode"}
         </button>
 
+        <button
+          onClick={toggleGrid}
+          className="text-black border border-white rounded p-2 cursor-pointer bg-white"
+        >
+          {showGrid ? "Hide Grid" : "Show Grid"}
+        </button>
+
         {isDrawingWall && (
           <div className="text-white bg-black bg-opacity-70 p-2 rounded">
-            Click to place the end of the wall
+            Click to place the end of the wall (45° angles only)
           </div>
         )}
       </div>
 
-      {/* Object info panel */}
       {selectedObject && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-70 text-white p-4 m-4 rounded">
           <h3 className="text-xl font-bold mb-2">Selected Object</h3>
@@ -383,6 +464,17 @@ const FloorPlanEditor: React.FC = () => {
           <p>
             <strong>Texture:</strong> {selectedObject.texture}
           </p>
+          <button
+            className="bg-white text-black p-2 rounded"
+            onClick={() => {
+              const newWalls = walls.filter(
+                (wall) => wall.id !== selectedObject.id
+              );
+              setWalls(newWalls);
+            }}
+          >
+            Delete
+          </button>
         </div>
       )}
     </div>
