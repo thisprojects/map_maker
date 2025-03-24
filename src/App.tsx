@@ -11,36 +11,36 @@ const wallArray: Wall[] = [
   {
     id: "wall-top",
     x1: 100,
-    y1: 100,
+    y1: 200,
     x2: 500,
-    y2: 100,
+    y2: 200,
     texture: "brickWall",
   },
   // Bottom wall
   {
     id: "wall-bottom",
     x1: 100,
-    y1: 500,
+    y1: 600,
     x2: 500,
-    y2: 500,
+    y2: 600,
     texture: "brickWall",
   },
   // Left wall
   {
     id: "wall-left",
     x1: 100,
-    y1: 100,
+    y1: 200,
     x2: 100,
-    y2: 500,
+    y2: 600,
     texture: "brickWall",
   },
   // Right wall
   {
     id: "wall-right",
     x1: 500,
-    y1: 100,
+    y1: 200,
     x2: 500,
-    y2: 500,
+    y2: 600,
     texture: "brickWall",
   },
 ];
@@ -49,7 +49,7 @@ const floorArray: Floor[] = [
   {
     id: "floor-main",
     x: 100,
-    y: 100,
+    y: 200,
     width: 400,
     height: 400,
     texture: "concreteFloor",
@@ -58,18 +58,22 @@ const floorArray: Floor[] = [
 
 const FloorPlanEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
   const [walls, setWalls] = useState<Wall[]>(wallArray);
   const [floors, setFloors] = useState<Floor[]>(floorArray);
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
   );
-  const [rooms, setRooms] = useState<number[]>([]);
+  const [rooms, setRooms] = useState<string[]>([]);
   const [tempWall, setTempWall] = useState<Wall | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
     null
   );
-  const [mode, setMode] = useState<"select" | "addWall" | "addFloor">("select");
+  const [mode, setMode] = useState<
+    "select" | "addWall" | "addFloor" | "addRoom"
+  >("select");
   const [showGrid, setShowGrid] = useState(true);
   const [tempFloor, setTempFloor] = useState<Floor | null>(null);
   const [isDrawingFloor, setIsDrawingFloor] = useState(false);
@@ -305,6 +309,7 @@ const FloorPlanEditor: React.FC = () => {
               type: "wall",
               texture: wall.texture,
               clickPoint: { x: mouseX, y: mouseY },
+              roomId: wall.roomId,
             });
             clickedObject = true;
             break;
@@ -508,7 +513,7 @@ const FloorPlanEditor: React.FC = () => {
   ]);
 
   const setModeAndResetDrawing = (
-    newMode: "select" | "addWall" | "addFloor"
+    newMode: "select" | "addWall" | "addFloor" | "addRoom"
   ) => {
     setMode(newMode);
     // Reset all drawing states when switching modes
@@ -534,6 +539,8 @@ const FloorPlanEditor: React.FC = () => {
 
   // Available floor textures
   const floorTextures = ["concreteFloor", "woodFloor", "tileFloor"];
+
+  console.log("WALLS", selectedObject);
 
   return (
     <div className="relative">
@@ -566,6 +573,30 @@ const FloorPlanEditor: React.FC = () => {
         >
           Add Floor
         </button>
+        <div className="flex flex-col">
+          <button
+            onClick={() =>
+              setRooms((rooms) => {
+                const newRooms = [...rooms];
+                if (inputRef?.current) {
+                  newRooms.push(inputRef?.current?.value);
+                }
+                return newRooms;
+              })
+            }
+            className={`text-black border border-white rounded p-2 cursor-pointer ${
+              mode === "addRoom" ? "bg-blue-200" : "bg-white"
+            }`}
+          >
+            Add Room
+          </button>
+          <input
+            onFocus={() => setModeAndResetDrawing("addRoom")}
+            ref={inputRef}
+            type="text"
+            className="bg-white border border-solid border-black rounded p-2 m-1"
+          />
+        </div>
 
         <button
           onClick={toggleGrid}
@@ -588,74 +619,121 @@ const FloorPlanEditor: React.FC = () => {
       )}
 
       {selectedObject && (
-        <div className="absolute bottom-0 left-0 bg-black bg-opacity-70 text-white p-4 m-4 rounded">
-          <h3 className="text-xl font-bold mb-2">Selected Object</h3>
-          <p>
-            <strong>ID:</strong> {selectedObject.id}
-          </p>
-          <p>
-            <strong>Type:</strong> {selectedObject.type}
-          </p>
-          {selectedObject.clickPoint && (
+        <div className="absolute bottom-0 left-0 bg-black bg-opacity-70 text-white p-4 m-4 rounded flex">
+          <div>
+            <h3 className="text-xl font-bold mb-2">Selected Object</h3>
             <p>
-              <strong>Click Position:</strong> x:{" "}
-              {selectedObject.clickPoint.x.toFixed(2)}, y:{" "}
-              {selectedObject.clickPoint.y.toFixed(2)}
+              <strong>ID:</strong> {selectedObject.id}
             </p>
-          )}
-          <p>
-            <strong>Texture:</strong> {selectedObject.texture}
-          </p>
-
-          {/* Texture selection for floors */}
-          {selectedObject.type === "floor" && (
-            <div className="mt-2">
+            <p>
+              <strong>Room ID:</strong> {selectedObject?.roomId}
+            </p>
+            <p>
+              <strong>Type:</strong> {selectedObject.type}
+            </p>
+            {selectedObject.clickPoint && (
               <p>
-                <strong>Change Texture:</strong>
+                <strong>Click Position:</strong> x:{" "}
+                {selectedObject.clickPoint.x.toFixed(2)}, y:{" "}
+                {selectedObject.clickPoint.y.toFixed(2)}
               </p>
-              <div className="flex gap-2 mt-2">
-                {floorTextures.map((texture) => (
-                  <div
-                    key={texture}
-                    onClick={() =>
-                      changeFloorTexture(selectedObject.id, texture)
-                    }
-                    className="w-8 h-8 cursor-pointer border border-white"
-                    style={{
-                      backgroundColor:
-                        textureColors[texture as keyof typeof textureColors],
-                      outline:
-                        selectedObject.texture === texture
-                          ? "2px solid yellow"
-                          : "none",
-                    }}
-                    title={texture}
-                  />
-                ))}
+            )}
+            <p>
+              <strong>Texture:</strong> {selectedObject.texture}
+            </p>
+
+            {/* Texture selection for floors */}
+            {selectedObject.type === "floor" && (
+              <div className="mt-2">
+                <p>
+                  <strong>Change Texture:</strong>
+                </p>
+                <div className="flex gap-2 mt-2">
+                  {floorTextures.map((texture) => (
+                    <div
+                      key={texture}
+                      onClick={() =>
+                        changeFloorTexture(selectedObject.id, texture)
+                      }
+                      className="w-8 h-8 cursor-pointer border border-white"
+                      style={{
+                        backgroundColor:
+                          textureColors[texture as keyof typeof textureColors],
+                        outline:
+                          selectedObject.texture === texture
+                            ? "2px solid yellow"
+                            : "none",
+                      }}
+                      title={texture}
+                    />
+                  ))}
+                </div>
               </div>
+            )}
+
+            <button
+              className="bg-white text-black p-2 rounded mt-4"
+              onClick={() => {
+                if (selectedObject.type === "wall") {
+                  const newWalls = walls.filter(
+                    (wall) => wall.id !== selectedObject.id
+                  );
+                  setWalls(newWalls);
+                } else if (selectedObject.type === "floor") {
+                  const newFloors = floors.filter(
+                    (floor) => floor.id !== selectedObject.id
+                  );
+                  setFloors(newFloors);
+                }
+                setSelectedObject(null);
+              }}
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => {
+                setShowRoomPicker((prev) => !prev);
+              }}
+              className="ml-2 bg-white text-black p-2 rounded cursor-pointer"
+            >
+              Add to room
+            </button>
+          </div>
+          {showRoomPicker && (
+            <div className="bg-black min-w-[100px] text-center">
+              {rooms?.map((room) => (
+                <button
+                  className="border border-solid bg-white text-black border-white p-2 rounded cursor-pointer m-1"
+                  onClick={() => {
+                    if (selectedObject.type === "wall") {
+                      console.log("select obj", selectedObject);
+                      setWalls((prev) => {
+                        const newWalls = [...prev];
+                        const selectedWall = newWalls.find(
+                          (wall) => wall.id === selectedObject.id
+                        );
+                        console.log("SELECTED WALL", selectedWall);
+                        if (selectedWall) {
+                          selectedWall.roomId = room;
+                        }
+                        return newWalls;
+                      });
+                      setSelectedObject((prev) => {
+                        const newObject: SelectedObject = {
+                          ...prev,
+                        } as SelectedObject;
+                        newObject.roomId = String(room);
+                        return newObject;
+                      });
+                    }
+                    setShowRoomPicker(false);
+                  }}
+                >
+                  {room}
+                </button>
+              ))}
             </div>
           )}
-
-          <button
-            className="bg-white text-black p-2 rounded mt-4"
-            onClick={() => {
-              if (selectedObject.type === "wall") {
-                const newWalls = walls.filter(
-                  (wall) => wall.id !== selectedObject.id
-                );
-                setWalls(newWalls);
-              } else if (selectedObject.type === "floor") {
-                const newFloors = floors.filter(
-                  (floor) => floor.id !== selectedObject.id
-                );
-                setFloors(newFloors);
-              }
-              setSelectedObject(null);
-            }}
-          >
-            Delete
-          </button>
-          <button>Add to room</button>
         </div>
       )}
     </div>
