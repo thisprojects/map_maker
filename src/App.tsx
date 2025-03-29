@@ -325,6 +325,7 @@ const FloorPlanEditor: React.FC = () => {
                 type: "floor",
                 texture: floor.texture,
                 clickPoint: { x: mouseX, y: mouseY },
+                roomId: floor.roomId,
               });
               clickedObject = true;
               break;
@@ -540,7 +541,114 @@ const FloorPlanEditor: React.FC = () => {
   // Available floor textures
   const floorTextures = ["concreteFloor", "woodFloor", "tileFloor"];
 
-  console.log("WALLS", selectedObject);
+  console.log("FLOORS", floors);
+
+  const saveMap = () => {
+    const roomList = rooms.map((room) => {
+      const roomWalls = walls.map((wall) => {
+        if (wall.roomId === room) {
+          let x,
+            y,
+            z,
+            width,
+            height,
+            rotation,
+            texture,
+            depth,
+            normal,
+            roomWall;
+
+          if (wall.x1 === wall.x2) {
+            // West / East wall
+            width = wall.y2 - wall.y1;
+            height = 5;
+            z = (wall.y2 + wall.y1) / 2; // Midpoint between y1 and y2
+            x = wall.x1;
+            y = 0;
+            rotation = Math.PI / 2;
+            texture = "west";
+            depth = 0;
+            normal = { x: 1, y: 0, z: 0 };
+          } else {
+            // North / South wall
+            width = wall.x2 - wall.x1;
+            height = 5;
+            x = (wall.x2 + wall.x1) / 2; // Midpoint between x1 and x2
+            z = wall.y1;
+            y = 0;
+            rotation = 0;
+            texture = "north";
+            depth = 0;
+            normal = { x: 0, y: 0, z: 1 };
+          }
+
+          roomWall = {
+            x,
+            y,
+            z,
+            width,
+            height,
+            rotation,
+            texture,
+            depth,
+            normal,
+          };
+
+          console.log("room wall", roomWall);
+          return roomWall;
+        }
+      });
+
+      const roomFloors = floors.map((floor) => {
+        // Correct the floor positioning, using the top-left corner
+        const x = floor.x + floor.width / 2; // This should center the floor on x
+        const z = floor.y + floor.height / 2; // This should center the floor on z
+        const y = -1; // Ground level (adjust as needed)
+        const width = floor.width; // Don't scale down the width
+        const length = floor.height; // Don't scale down the height
+        const texture = "floor";
+        const rotation = -Math.PI / 2; // Correct rotation for the floor
+        return {
+          x,
+          y,
+          z,
+          width,
+          length,
+          texture,
+          rotation,
+        };
+      });
+
+      return { walls: roomWalls, floors: roomFloors };
+    });
+
+    console.log(
+      "ROOM LIST",
+      JSON.stringify({
+        name: "Level 1",
+        textures: [
+          { type: "wall", name: "north", path: "WALL01.png" },
+          { type: "wall", name: "south", path: "WALL01.png" },
+          { type: "wall", name: "east", path: "WALL02.png" },
+          { type: "wall", name: "west", path: "WALL02.png" },
+          { type: "floor", name: "floor", path: "FLOOR.png" },
+        ],
+        rooms: roomList,
+        entities: [
+          {
+            type: "player",
+            position: { x: 2, y: 0, z: 2 },
+            properties: { speed: 5, health: 100 },
+          },
+          {
+            type: "enemy",
+            position: { x: 8, y: 0, z: 8 },
+            properties: { ai: "patrol", damage: 10 },
+          },
+        ],
+      })
+    );
+  };
 
   return (
     <div className="relative">
@@ -603,6 +711,12 @@ const FloorPlanEditor: React.FC = () => {
           className="text-black border border-white rounded p-2 cursor-pointer bg-white"
         >
           {showGrid ? "Hide Grid" : "Show Grid"}
+        </button>
+        <button
+          className="text-black border border-white rounded p-2 cursor-pointer bg-white"
+          onClick={saveMap}
+        >
+          Save Map
         </button>
       </div>
 
@@ -717,6 +831,26 @@ const FloorPlanEditor: React.FC = () => {
                           selectedWall.roomId = room;
                         }
                         return newWalls;
+                      });
+                      setSelectedObject((prev) => {
+                        const newObject: SelectedObject = {
+                          ...prev,
+                        } as SelectedObject;
+                        newObject.roomId = String(room);
+                        return newObject;
+                      });
+                    }
+                    if (selectedObject.type === "floor") {
+                      setFloors((prev) => {
+                        const newFloors = [...prev];
+                        const selectedFloor = newFloors.find(
+                          (floor) => floor.id === selectedObject.id
+                        );
+
+                        if (selectedFloor) {
+                          selectedFloor.roomId = room;
+                        }
+                        return newFloors;
                       });
                       setSelectedObject((prev) => {
                         const newObject: SelectedObject = {
