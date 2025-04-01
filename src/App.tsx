@@ -6,61 +6,16 @@ import { Floor, SelectedObject, Wall } from "./types/editor";
 const GRID_SIZE = 20; // Size of each grid cell
 
 // Initial data
-const wallArray: Wall[] = [
-  // Top wall
-  {
-    id: "wall-top",
-    x1: 100,
-    y1: 200,
-    x2: 500,
-    y2: 200,
-    texture: "brickWall",
-  },
-  // Bottom wall
-  {
-    id: "wall-bottom",
-    x1: 100,
-    y1: 600,
-    x2: 500,
-    y2: 600,
-    texture: "brickWall",
-  },
-  // Left wall
-  {
-    id: "wall-left",
-    x1: 100,
-    y1: 200,
-    x2: 100,
-    y2: 600,
-    texture: "brickWall",
-  },
-  // Right wall
-  {
-    id: "wall-right",
-    x1: 500,
-    y1: 200,
-    x2: 500,
-    y2: 600,
-    texture: "brickWall",
-  },
-];
+const wallArray: Wall[] = [];
 
-const floorArray: Floor[] = [
-  {
-    id: "floor-main",
-    x: 100,
-    y: 200,
-    width: 400,
-    height: 400,
-    texture: "concreteFloor",
-  },
-];
+const floorArray: Floor[] = [];
 
 const FloorPlanEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
   const [walls, setWalls] = useState<Wall[]>(wallArray);
+  const [spawnPoint, setSpawnPoint] = useState({});
   const [floors, setFloors] = useState<Floor[]>(floorArray);
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
@@ -72,7 +27,7 @@ const FloorPlanEditor: React.FC = () => {
     null
   );
   const [mode, setMode] = useState<
-    "select" | "addWall" | "addFloor" | "addRoom"
+    "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint"
   >("select");
   const [showGrid, setShowGrid] = useState(true);
   const [tempFloor, setTempFloor] = useState<Floor | null>(null);
@@ -298,154 +253,161 @@ const FloorPlanEditor: React.FC = () => {
       // Snap coordinates to grid
       const { x, y } = snapToGrid(mouseX, mouseY);
 
-      if (mode === "select") {
-        // Check if we clicked on a wall
-        let clickedObject = false;
+      switch (mode) {
+        case "select":
+          // Check if we clicked on a wall
+          let clickedObject = false;
 
-        for (const wall of walls) {
-          if (isPointOnWall(mouseX, mouseY, wall)) {
-            setSelectedObject({
-              id: wall.id,
-              type: "wall",
-              texture: wall.texture,
-              clickPoint: { x: mouseX, y: mouseY },
-              roomId: wall.roomId,
-            });
-            clickedObject = true;
-            break;
-          }
-        }
-
-        // If not on a wall, check floors
-        if (!clickedObject) {
-          for (const floor of floors) {
-            if (isPointOnFloor(mouseX, mouseY, floor)) {
+          for (const wall of walls) {
+            if (isPointOnWall(mouseX, mouseY, wall)) {
               setSelectedObject({
-                id: floor.id,
-                type: "floor",
-                texture: floor.texture,
+                id: wall.id,
+                type: "wall",
+                texture: wall.texture,
                 clickPoint: { x: mouseX, y: mouseY },
-                roomId: floor.roomId,
+                roomId: wall.roomId,
               });
               clickedObject = true;
               break;
             }
           }
-        }
 
-        // Clear selection if clicked on empty space
-        if (!clickedObject) {
-          setSelectedObject(null);
-        }
-      } else if (mode === "addWall") {
-        if (!isDrawingWall) {
-          const escapeKeyHandler = (event: KeyboardEvent) => {
-            if (
-              event.key === "Escape" ||
-              event.key === "Esc" ||
-              event.keyCode === 27
-            ) {
-              setIsDrawingWall(false);
-              setTempWall(null);
-              setStartPoint(null);
-              console.log("Escape key was pressed!");
-
-              document.removeEventListener("keydown", escapeKeyHandler);
-              console.log("Event listener removed");
-            }
-          };
-
-          document.addEventListener("keydown", escapeKeyHandler);
-
-          setIsDrawingWall(true);
-          setStartPoint({ x, y });
-          setTempWall({
-            id: "temp-wall",
-            x1: x,
-            y1: y,
-            x2: x,
-            y2: y,
-            texture: "brickWall",
-          });
-        } else {
-          // Finish drawing the wall
-          setIsDrawingWall(false);
-
-          if (tempWall && startPoint) {
-            // Only add wall if it has some minimum length
-            const length = Math.sqrt(
-              Math.pow(tempWall.x2 - tempWall.x1, 2) +
-                Math.pow(tempWall.y2 - tempWall.y1, 2)
-            );
-
-            if (length > 20) {
-              const newWall: Wall = {
-                id: `wall-${Date.now()}`,
-                x1: startPoint.x,
-                y1: startPoint.y,
-                x2: tempWall.x2,
-                y2: tempWall.y2,
-                texture: "brickWall",
-              };
-              setWalls([...walls, newWall]);
+          // If not on a wall, check floors
+          if (!clickedObject) {
+            for (const floor of floors) {
+              if (isPointOnFloor(mouseX, mouseY, floor)) {
+                setSelectedObject({
+                  id: floor.id,
+                  type: "floor",
+                  texture: floor.texture,
+                  clickPoint: { x: mouseX, y: mouseY },
+                  roomId: floor.roomId,
+                });
+                clickedObject = true;
+                break;
+              }
             }
           }
 
-          setTempWall(null);
-          setStartPoint(null);
-        }
-      } else if (mode === "addFloor") {
-        if (!isDrawingFloor) {
-          // Setup escape key handler for canceling floor creation
-          const escapeKeyHandler = (event: KeyboardEvent) => {
-            if (
-              event.key === "Escape" ||
-              event.key === "Esc" ||
-              event.keyCode === 27
-            ) {
-              setIsDrawingFloor(false);
-              setTempFloor(null);
-              setStartPoint(null);
-              console.log("Escape key was pressed - floor creation canceled");
-              document.removeEventListener("keydown", escapeKeyHandler);
-            }
-          };
-
-          document.addEventListener("keydown", escapeKeyHandler);
-
-          // Start drawing floor
-          setIsDrawingFloor(true);
-          setStartPoint({ x, y });
-          setTempFloor({
-            id: "temp-floor",
-            x,
-            y,
-            width: 0,
-            height: 0,
-            texture: "concreteFloor",
-          });
-        } else {
-          // Finish drawing the floor
-          setIsDrawingFloor(false);
-
-          if (tempFloor && startPoint) {
-            // Only add floor if it has some minimum size
-            if (tempFloor.width > 20 && tempFloor.height > 20) {
-              const newFloor: Floor = {
-                id: `floor-${Date.now()}`,
-                x: tempFloor.x,
-                y: tempFloor.y,
-                width: tempFloor.width,
-                height: tempFloor.height,
-                texture: "concreteFloor",
-              };
-              setFloors([...floors, newFloor]);
-            }
+          // Clear selection if clicked on empty space
+          if (!clickedObject) {
+            setSelectedObject(null);
           }
+          break;
+        case "addWall":
+          if (!isDrawingWall) {
+            const escapeKeyHandler = (event: KeyboardEvent) => {
+              if (
+                event.key === "Escape" ||
+                event.key === "Esc" ||
+                event.keyCode === 27
+              ) {
+                setIsDrawingWall(false);
+                setTempWall(null);
+                setStartPoint(null);
+                console.log("Escape key was pressed!");
 
-          setTempFloor(null);
-          setStartPoint(null);
-        }
+                document.removeEventListener("keydown", escapeKeyHandler);
+                console.log("Event listener removed");
+              }
+            };
+
+            document.addEventListener("keydown", escapeKeyHandler);
+
+            setIsDrawingWall(true);
+            setStartPoint({ x, y });
+            setTempWall({
+              id: "temp-wall",
+              x1: x,
+              y1: y,
+              x2: x,
+              y2: y,
+              texture: "brickWall",
+            });
+          } else {
+            // Finish drawing the wall
+            setIsDrawingWall(false);
+
+            if (tempWall && startPoint) {
+              // Only add wall if it has some minimum length
+              const length = Math.sqrt(
+                Math.pow(tempWall.x2 - tempWall.x1, 2) +
+                  Math.pow(tempWall.y2 - tempWall.y1, 2)
+              );
+
+              if (length > 20) {
+                const newWall: Wall = {
+                  id: `wall-${Date.now()}`,
+                  x1: startPoint.x,
+                  y1: startPoint.y,
+                  x2: tempWall.x2,
+                  y2: tempWall.y2,
+                  texture: "brickWall",
+                };
+                setWalls([...walls, newWall]);
+              }
+            }
+
+            setTempWall(null);
+            setStartPoint(null);
+          }
+          break;
+        case "addFloor":
+          if (!isDrawingFloor) {
+            // Setup escape key handler for canceling floor creation
+            const escapeKeyHandler = (event: KeyboardEvent) => {
+              if (
+                event.key === "Escape" ||
+                event.key === "Esc" ||
+                event.keyCode === 27
+              ) {
+                setIsDrawingFloor(false);
+                setTempFloor(null);
+                setStartPoint(null);
+                console.log("Escape key was pressed - floor creation canceled");
+                document.removeEventListener("keydown", escapeKeyHandler);
+              }
+            };
+
+            document.addEventListener("keydown", escapeKeyHandler);
+
+            // Start drawing floor
+            setIsDrawingFloor(true);
+            setStartPoint({ x, y });
+            setTempFloor({
+              id: "temp-floor",
+              x,
+              y,
+              width: 0,
+              height: 0,
+              texture: "concreteFloor",
+            });
+          } else {
+            // Finish drawing the floor
+            setIsDrawingFloor(false);
+
+            if (tempFloor && startPoint) {
+              // Only add floor if it has some minimum size
+              if (tempFloor.width > 20 && tempFloor.height > 20) {
+                const newFloor: Floor = {
+                  id: `floor-${Date.now()}`,
+                  x: tempFloor.x,
+                  y: tempFloor.y,
+                  width: tempFloor.width,
+                  height: tempFloor.height,
+                  texture: "concreteFloor",
+                };
+                setFloors([...floors, newFloor]);
+              }
+            }
+
+            setTempFloor(null);
+            setStartPoint(null);
+          }
+          break;
+        case "spawnPoint":
+          setSpawnPoint({ x, z: y, y: 0, rotation: 0 });
+          break;
       }
     };
 
@@ -514,7 +476,7 @@ const FloorPlanEditor: React.FC = () => {
   ]);
 
   const setModeAndResetDrawing = (
-    newMode: "select" | "addWall" | "addFloor" | "addRoom"
+    newMode: "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint"
   ) => {
     setMode(newMode);
     // Reset all drawing states when switching modes
@@ -540,8 +502,6 @@ const FloorPlanEditor: React.FC = () => {
 
   // Available floor textures
   const floorTextures = ["concreteFloor", "woodFloor", "tileFloor"];
-
-  console.log("FLOORS", floors);
 
   const saveMap = () => {
     const roomList = rooms.map((room) => {
@@ -594,7 +554,6 @@ const FloorPlanEditor: React.FC = () => {
             normal,
           };
 
-          console.log("room wall", roomWall);
           return roomWall;
         }
       });
@@ -619,35 +578,55 @@ const FloorPlanEditor: React.FC = () => {
         };
       });
 
+      console.log("ROOM WALLS", roomWalls);
+      console.log("ROOM FLOORS", roomFloors);
+
       return { walls: roomWalls, floors: roomFloors };
     });
 
-    console.log(
-      "ROOM LIST",
-      JSON.stringify({
-        name: "Level 1",
-        textures: [
-          { type: "wall", name: "north", path: "WALL01.png" },
-          { type: "wall", name: "south", path: "WALL01.png" },
-          { type: "wall", name: "east", path: "WALL02.png" },
-          { type: "wall", name: "west", path: "WALL02.png" },
-          { type: "floor", name: "floor", path: "FLOOR.png" },
-        ],
-        rooms: roomList,
-        entities: [
-          {
-            type: "player",
-            position: { x: 2, y: 0, z: 2 },
-            properties: { speed: 5, health: 100 },
-          },
-          {
-            type: "enemy",
-            position: { x: 8, y: 0, z: 8 },
-            properties: { ai: "patrol", damage: 10 },
-          },
-        ],
-      })
-    );
+    const savedMap = JSON.stringify({
+      name: "Level 1",
+      spawnPoint,
+      textures: [
+        { type: "wall", name: "north", path: "WALL01.png" },
+        { type: "wall", name: "south", path: "WALL01.png" },
+        { type: "wall", name: "east", path: "WALL02.png" },
+        { type: "wall", name: "west", path: "WALL02.png" },
+        { type: "floor", name: "floor", path: "FLOOR.png" },
+      ],
+      rooms: roomList,
+      entities: [
+        {
+          type: "player",
+          position: { x: 2, y: 0, z: 2 },
+          properties: { speed: 5, health: 100 },
+        },
+        {
+          type: "enemy",
+          position: { x: 8, y: 0, z: 8 },
+          properties: { ai: "patrol", damage: 10 },
+        },
+      ],
+    });
+
+    // Create a blob with the JSON data
+    const blob = new Blob([savedMap], { type: "application/json" });
+
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary anchor element
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "map";
+
+    // Append to the document, click it to trigger download, then remove it
+    document.body.appendChild(link);
+    link.click();
+
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -717,6 +696,15 @@ const FloorPlanEditor: React.FC = () => {
           onClick={saveMap}
         >
           Save Map
+        </button>
+
+        <button
+          onClick={() => setModeAndResetDrawing("spawnPoint")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "spawnPoint" ? "bg-blue-200" : "bg-white"
+          }`}
+        >
+          Add Spawn Point
         </button>
       </div>
 
