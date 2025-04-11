@@ -3,7 +3,8 @@ import "./index.css";
 import { Floor, SelectedObject, Wall } from "./types/editor";
 
 // Grid settings
-const GRID_SIZE = 20; // Size of each grid cell
+const GRID_SIZE = 50; // Size of each grid cell
+const SCALE_FACTOR = 0.1; // Scale factor to reduce the map size to 1/10th
 
 // Initial data
 const wallArray: Wall[] = [];
@@ -542,15 +543,16 @@ const FloorPlanEditor: React.FC = () => {
             normal = { x: 0, y: 0, z: 1 };
           }
 
+          // Apply scaling to the 3D coordinates and dimensions
           roomWall = {
-            x,
-            y,
-            z,
-            width,
+            x: x * SCALE_FACTOR,
+            y: y * SCALE_FACTOR,
+            z: z * SCALE_FACTOR,
+            width: width * SCALE_FACTOR,
             height,
             rotation,
             texture,
-            depth,
+            depth: depth * SCALE_FACTOR,
             normal,
           };
 
@@ -558,35 +560,48 @@ const FloorPlanEditor: React.FC = () => {
         }
       });
 
-      const roomFloors = floors.map((floor) => {
-        // Correct the floor positioning, using the top-left corner
-        const x = floor.x + floor.width / 2; // This should center the floor on x
-        const z = floor.y + floor.height / 2; // This should center the floor on z
-        const y = -1; // Ground level (adjust as needed)
-        const width = floor.width; // Don't scale down the width
-        const length = floor.height; // Don't scale down the height
-        const texture = "floor";
-        const rotation = -Math.PI / 2; // Correct rotation for the floor
-        return {
-          x,
-          y,
-          z,
-          width,
-          length,
-          texture,
-          rotation,
-        };
-      });
+      const roomFloors = floors
+        .map((floor) => {
+          if (floor.roomId === room) {
+            // Correct the floor positioning, using the top-left corner
+            const x = floor.x + floor.width / 2; // This should center the floor on x
+            const z = floor.y + floor.height / 2; // This should center the floor on z
+            const y = -1; // Ground level (adjust as needed)
+
+            // Apply scaling to the coordinates and dimensions
+            return {
+              x: x * SCALE_FACTOR,
+              y: y * SCALE_FACTOR,
+              z: z * SCALE_FACTOR,
+              width: floor.width * SCALE_FACTOR,
+              length: floor.height * SCALE_FACTOR,
+              texture: "floor",
+              rotation: -Math.PI / 2, // Correct rotation for the floor
+            };
+          }
+        })
+        .filter(Boolean);
 
       console.log("ROOM WALLS", roomWalls);
       console.log("ROOM FLOORS", roomFloors);
 
-      return { walls: roomWalls, floors: roomFloors };
+      return { walls: roomWalls.filter(Boolean), floors: roomFloors };
     });
+
+    // Scale spawn point if it exists
+    const scaledSpawnPoint =
+      Object.keys(spawnPoint).length > 0
+        ? {
+            x: (spawnPoint as any).x * SCALE_FACTOR,
+            y: (spawnPoint as any).y * SCALE_FACTOR,
+            z: (spawnPoint as any).z * SCALE_FACTOR,
+            rotation: (spawnPoint as any).rotation,
+          }
+        : spawnPoint;
 
     const savedMap = JSON.stringify({
       name: "Level 1",
-      spawnPoint,
+      spawnPoint: scaledSpawnPoint,
       textures: [
         { type: "wall", name: "north", path: "WALL01.png" },
         { type: "wall", name: "south", path: "WALL01.png" },
@@ -598,12 +613,14 @@ const FloorPlanEditor: React.FC = () => {
       entities: [
         {
           type: "player",
-          position: { x: 2, y: 0, z: 2 },
+          // Scale the entity positions too
+          position: { x: 2 * SCALE_FACTOR, y: 0, z: 2 * SCALE_FACTOR },
           properties: { speed: 5, health: 100 },
         },
         {
           type: "enemy",
-          position: { x: 8, y: 0, z: 8 },
+          // Scale the entity positions too
+          position: { x: 8 * SCALE_FACTOR, y: 0, z: 8 * SCALE_FACTOR },
           properties: { ai: "patrol", damage: 10 },
         },
       ],
@@ -695,7 +712,7 @@ const FloorPlanEditor: React.FC = () => {
           className="text-black border border-white rounded p-2 cursor-pointer bg-white"
           onClick={saveMap}
         >
-          Save Map
+          Save Map (1/10 Scale)
         </button>
 
         <button
@@ -805,6 +822,7 @@ const FloorPlanEditor: React.FC = () => {
             <div className="bg-black min-w-[100px] text-center">
               {rooms?.map((room) => (
                 <button
+                  key={room}
                   className="border border-solid bg-white text-black border-white p-2 rounded cursor-pointer m-1"
                   onClick={() => {
                     if (selectedObject.type === "wall") {
