@@ -603,11 +603,11 @@ const FloorPlanEditor: React.FC = () => {
       name: "Level 1",
       spawnPoint: scaledSpawnPoint,
       textures: [
-        { type: "wall", name: "north", path: "WALL01.png" },
-        { type: "wall", name: "south", path: "WALL01.png" },
-        { type: "wall", name: "east", path: "WALL02.png" },
-        { type: "wall", name: "west", path: "WALL02.png" },
-        { type: "floor", name: "floor", path: "FLOOR.png" },
+        { type: "wall", name: "north", path: "FreeDoomWall1.png" },
+        { type: "wall", name: "south", path: "FreeDoomWall1.png" },
+        { type: "wall", name: "east", path: "FreeDoomWall2.png" },
+        { type: "wall", name: "west", path: "FreeDoomWall2.png" },
+        { type: "floor", name: "floor", path: "FreeDoomFloor1.png" },
       ],
       rooms: roomList,
       entities: [
