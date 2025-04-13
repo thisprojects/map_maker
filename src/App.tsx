@@ -594,7 +594,7 @@ const FloorPlanEditor: React.FC = () => {
             // Apply scaling to the coordinates and dimensions
             return {
               x: x * SCALE_FACTOR,
-              y: y * SCALE_FACTOR,
+              y: y,
               z: z * SCALE_FACTOR,
               width: floor.width * SCALE_FACTOR,
               length: floor.height * SCALE_FACTOR,
@@ -604,9 +604,6 @@ const FloorPlanEditor: React.FC = () => {
           }
         })
         .filter(Boolean);
-
-      console.log("ROOM WALLS", roomWalls);
-      console.log("ROOM FLOORS", roomFloors);
 
       return { walls: roomWalls.filter(Boolean), floors: roomFloors };
     });
