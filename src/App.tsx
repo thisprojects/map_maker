@@ -21,7 +21,7 @@ const FloorPlanEditor: React.FC = () => {
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
   );
-  const [rooms, setRooms] = useState<string[]>([]);
+  const [rooms, setRooms] = useState<string[]>(["1"]);
   const [tempWall, setTempWall] = useState<Wall | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
@@ -344,6 +344,7 @@ const FloorPlanEditor: React.FC = () => {
                   x2: tempWall.x2,
                   y2: tempWall.y2,
                   texture: "brickWall",
+                  roomId: "1",
                 };
                 setWalls([...walls, newWall]);
               }
@@ -397,6 +398,7 @@ const FloorPlanEditor: React.FC = () => {
                   width: tempFloor.width,
                   height: tempFloor.height,
                   texture: "concreteFloor",
+                  roomId: "1",
                 };
                 setFloors([...floors, newFloor]);
               }
@@ -520,39 +522,60 @@ const FloorPlanEditor: React.FC = () => {
             roomWall;
 
           if (wall.x1 === wall.x2) {
-            // West / East wall
-            width = wall.y2 - wall.y1;
+            // Vertical wall (West/East)
+            width = Math.abs(wall.y2 - wall.y1);
             height = 5;
-            z = (wall.y2 + wall.y1) / 2; // Midpoint between y1 and y2
+            z = (wall.y2 + wall.y1) / 2;
             x = wall.x1;
             y = 0;
-            rotation = Math.PI / 2;
+            rotation = -Math.PI / 2; // flipped
             texture = "west";
             depth = 0;
-            normal = { x: 1, y: 0, z: 0 };
-          } else {
-            // North / South wall
-            width = wall.x2 - wall.x1;
+            normal = { x: -1, y: 0, z: 0 }; // flipped
+          } else if (wall.y1 === wall.y2) {
+            // Horizontal wall (North/South)
+            width = Math.abs(wall.x2 - wall.x1);
             height = 5;
-            x = (wall.x2 + wall.x1) / 2; // Midpoint between x1 and x2
+            x = (wall.x2 + wall.x1) / 2;
             z = wall.y1;
             y = 0;
             rotation = 0;
             texture = "north";
             depth = 0;
-            normal = { x: 0, y: 0, z: 1 };
+            normal = { x: 0, y: 0, z: -1 }; // flipped
+          } else {
+            // Diagonal wall
+            const dx = wall.x2 - wall.x1;
+            const dy = wall.y2 - wall.y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            width = length;
+            height = 5;
+            x = (wall.x1 + wall.x2) / 2;
+            z = (wall.y1 + wall.y2) / 2;
+            y = 0;
+
+            rotation = -Math.atan2(dy, dx); // flipped sign
+            texture = "diagonal";
+            depth = 0;
+
+            normal = {
+              x: dy / length, // flipped
+              y: 0,
+              z: -dx / length, // flipped
+            };
           }
 
           // Apply scaling to the 3D coordinates and dimensions
           roomWall = {
-            x: x * SCALE_FACTOR,
-            y: y * SCALE_FACTOR,
-            z: z * SCALE_FACTOR,
-            width: width * SCALE_FACTOR,
+            x: x && x * SCALE_FACTOR,
+            y: y && y * SCALE_FACTOR,
+            z: z && z * SCALE_FACTOR,
+            width: width && width * SCALE_FACTOR,
             height,
             rotation,
             texture,
-            depth: depth * SCALE_FACTOR,
+            depth: depth && depth * SCALE_FACTOR,
             normal,
           };
 
