@@ -227,7 +227,6 @@ const FloorPlanEditor: React.FC = () => {
         );
         ctx.setLineDash([]);
       }
-
       if (tempStep) {
         ctx.save();
 
@@ -237,17 +236,35 @@ const FloorPlanEditor: React.FC = () => {
         // Rotate based on step rotation
         ctx.rotate((tempStep.rotation * Math.PI) / 2);
 
-        // Draw temporary step
-        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
+        // Fill with step texture color
+        ctx.fillStyle =
+          textureColors[tempStep.texture as keyof typeof textureColors];
+
+        // Draw the step rectangle
         const stepX = -tempStep.width / 2;
         const stepY = -tempStep.depth / 2;
         ctx.fillRect(stepX, stepY, tempStep.width, tempStep.depth);
 
+        // Draw step border with dashed line to indicate it's temporary
         ctx.strokeStyle = "#0088ff";
         ctx.setLineDash([5, 5]);
         ctx.lineWidth = 2;
         ctx.strokeRect(stepX, stepY, tempStep.width, tempStep.depth);
+
+        // Add rotation indicator
+        ctx.strokeStyle = "#ff3300";
         ctx.setLineDash([]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -tempStep.depth / 2 - 15);
+        ctx.stroke();
+
+        // Draw rotation angle text
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(`${tempStep.rotation * 90}°`, 0, -tempStep.depth / 2 - 20);
 
         ctx.restore();
       }
@@ -277,12 +294,19 @@ const FloorPlanEditor: React.FC = () => {
   }, [
     walls,
     floors,
-    selectedObject,
+    mode,
+    isDrawingWall,
+    isDrawingFloor,
+    startPoint,
     tempWall,
-    showGrid,
     tempFloor,
-    steps,
     tempStep,
+    steps,
+    stepRotation,
+    stepWidth,
+    stepHeight,
+    stepCount,
+    isDrawingStep,
   ]);
 
   // Handle mouse events
@@ -389,7 +413,7 @@ const FloorPlanEditor: React.FC = () => {
                 normal = { x: 0, y: 1, z: 0 };
             }
 
-            // Create the temporary step
+            // Create the temporary step with all required properties
             const newTempStep = {
               id: "temp-step",
               x: x,
@@ -403,6 +427,7 @@ const FloorPlanEditor: React.FC = () => {
               normal: normal,
             };
 
+            console.log("Creating temp step:", newTempStep); // Add this debug line
             setTempStep(newTempStep);
             setIsDrawingStep(true);
 
@@ -423,7 +448,7 @@ const FloorPlanEditor: React.FC = () => {
                 let stepZ = tempStep.z;
                 const offset = i * stepWidth * GRID_SIZE;
 
-                switch (stepRotation) {
+                switch (tempStep.rotation) {
                   case 0: // North
                     stepZ -= offset;
                     break;
@@ -697,12 +722,56 @@ const FloorPlanEditor: React.FC = () => {
       }
     };
 
+    const handleMouseWheel = (e: WheelEvent) => {
+      if (mode === "addStep" && isDrawingStep && tempStep) {
+        e.preventDefault();
+
+        // Determine rotation direction based on wheel delta
+        const direction = e.deltaY > 0 ? 1 : -1;
+
+        // Calculate new rotation (0: North, 1: East, 2: South, 3: West)
+        // Using modulo to ensure the value stays in the range 0-3
+        let newRotation = (tempStep.rotation + direction + 4) % 4;
+
+        // Calculate normal based on new rotation
+        let normal;
+        switch (newRotation) {
+          case 0: // North
+            normal = { x: 0, y: 1, z: 0 };
+            break;
+          case 1: // East
+            normal = { x: 1, y: 1, z: 0 };
+            break;
+          case 2: // South
+            normal = { x: 0, y: 1, z: 0 };
+            break;
+          case 3: // West
+            normal = { x: -1, y: 1, z: 0 };
+            break;
+          default:
+            normal = { x: 0, y: 1, z: 0 };
+        }
+
+        // Make sure to preserve ALL properties of the tempStep
+        setTempStep({
+          ...tempStep,
+          rotation: newRotation,
+          normal: normal,
+        });
+
+        console.log("Rotated step to", newRotation * 90, "degrees");
+        console.log("Updated tempStep:", tempStep); // Debug
+      }
+    };
+
     canvas.addEventListener("mousedown", handleMouseDown);
     canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("wheel", handleMouseWheel);
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("wheel", handleMouseWheel);
     };
   }, [
     walls,
@@ -713,13 +782,13 @@ const FloorPlanEditor: React.FC = () => {
     startPoint,
     tempWall,
     tempFloor,
-    tempStep, // Add this
-    steps, // Add this
-    stepRotation, // Add this
-    stepWidth, // Add this
-    stepHeight, // Add this
-    stepCount, // Add this
-    isDrawingStep, // Add this
+    tempStep,
+    steps,
+    stepRotation,
+    stepWidth,
+    stepHeight,
+    stepCount,
+    isDrawingStep,
   ]);
 
   // Update setModeAndResetDrawing function
