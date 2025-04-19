@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
-import { Floor, SelectedObject, Wall } from "./types/editor";
+import { Floor, SelectedObject, Wall, Step } from "./types/editor";
 
 // Grid settings
 const GRID_SIZE = 50; // Size of each grid cell
@@ -27,12 +27,22 @@ const FloorPlanEditor: React.FC = () => {
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
     null
   );
+
   const [mode, setMode] = useState<
-    "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint"
+    "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint" | "addStep"
   >("select");
+
   const [showGrid, setShowGrid] = useState(true);
   const [tempFloor, setTempFloor] = useState<Floor | null>(null);
   const [isDrawingFloor, setIsDrawingFloor] = useState(false);
+
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [isDrawingStep, setIsDrawingStep] = useState(false);
+  const [tempStep, setTempStep] = useState<Step | null>(null);
+  const [stepRotation, setStepRotation] = useState<number>(0); // 0: North, 1: East, 2: South, 3: West
+  const [stepHeight, setStepHeight] = useState<number>(1.5);
+  const [stepWidth, setStepWidth] = useState<number>(0.5);
+  const [stepCount, setStepCount] = useState<number>(6);
 
   // Map for textures - in a real app, we'd load image patterns
   const textureColors = {
@@ -115,6 +125,39 @@ const FloorPlanEditor: React.FC = () => {
         }
       }
 
+      steps.forEach((step) => {
+        ctx.save();
+
+        // Translate to the center of the step
+        ctx.translate(step.x, step.z);
+
+        // Rotate based on step rotation
+        ctx.rotate((step.rotation * Math.PI) / 2);
+
+        // Fill with step texture color
+        ctx.fillStyle =
+          textureColors[step.texture as keyof typeof textureColors];
+
+        // Draw the step rectangle (moved back to account for the rotation around center)
+        const stepX = -step.width / 2;
+        const stepY = -step.depth / 2;
+        ctx.fillRect(stepX, stepY, step.width, step.depth);
+
+        // Draw step border
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(stepX, stepY, step.width, step.depth);
+
+        // If selected, highlight with a different color
+        if (selectedObject && selectedObject.id === step.id) {
+          ctx.strokeStyle = "#ffcc00";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(stepX, stepY, step.width, step.depth);
+        }
+
+        ctx.restore();
+      });
+
       // Draw floors
       floors.forEach((floor) => {
         ctx.fillStyle =
@@ -184,6 +227,30 @@ const FloorPlanEditor: React.FC = () => {
         );
         ctx.setLineDash([]);
       }
+
+      if (tempStep) {
+        ctx.save();
+
+        // Translate to the center of the step
+        ctx.translate(tempStep.x, tempStep.z);
+
+        // Rotate based on step rotation
+        ctx.rotate((tempStep.rotation * Math.PI) / 2);
+
+        // Draw temporary step
+        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
+        const stepX = -tempStep.width / 2;
+        const stepY = -tempStep.depth / 2;
+        ctx.fillRect(stepX, stepY, tempStep.width, tempStep.depth);
+
+        ctx.strokeStyle = "#0088ff";
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(stepX, stepY, tempStep.width, tempStep.depth);
+        ctx.setLineDash([]);
+
+        ctx.restore();
+      }
     };
 
     // Initial draw
@@ -207,7 +274,16 @@ const FloorPlanEditor: React.FC = () => {
     return () => {
       window.removeEventListener("resize", handleResize);
     };
-  }, [walls, floors, selectedObject, tempWall, showGrid, tempFloor]);
+  }, [
+    walls,
+    floors,
+    selectedObject,
+    tempWall,
+    showGrid,
+    tempFloor,
+    steps,
+    tempStep,
+  ]);
 
   // Handle mouse events
   useEffect(() => {
@@ -236,6 +312,26 @@ const FloorPlanEditor: React.FC = () => {
       return distance <= lineWidth && withinBounds;
     };
 
+    // Add a helper function to check if a point is on a step
+    const isPointOnStep = (x: number, y: number, step: Step): boolean => {
+      // Convert mouse coordinates to the local coordinate system of the rotated step
+      const dx = x - step.x;
+      const dy = y - step.z;
+
+      // Rotate the point in the opposite direction of the step's rotation
+      const angle = (-step.rotation * Math.PI) / 2;
+      const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
+      const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
+
+      // Check if the rotated point is within the step bounds
+      return (
+        rotatedX >= -step.width / 2 &&
+        rotatedX <= step.width / 2 &&
+        rotatedY >= -step.depth / 2 &&
+        rotatedY <= step.depth / 2
+      );
+    };
+
     // Helper function to check if mouse is on a floor
     const isPointOnFloor = (x: number, y: number, floor: Floor): boolean => {
       return (
@@ -255,6 +351,121 @@ const FloorPlanEditor: React.FC = () => {
       const { x, y } = snapToGrid(mouseX, mouseY);
 
       switch (mode) {
+        // Find the addStep case in the handleMouseDown function and replace it with this code
+        case "addStep":
+          if (!isDrawingStep) {
+            // Start drawing the step
+            const escapeKeyHandler = (event: KeyboardEvent) => {
+              if (
+                event.key === "Escape" ||
+                event.key === "Esc" ||
+                event.keyCode === 27
+              ) {
+                setIsDrawingStep(false);
+                setTempStep(null);
+                console.log("Escape key was pressed - step creation canceled");
+                document.removeEventListener("keydown", escapeKeyHandler);
+              }
+            };
+
+            document.addEventListener("keydown", escapeKeyHandler);
+
+            // Calculate normal based on rotation
+            let normal;
+            switch (stepRotation) {
+              case 0: // North
+                normal = { x: 0, y: 1, z: 0 };
+                break;
+              case 1: // East
+                normal = { x: 1, y: 1, z: 0 };
+                break;
+              case 2: // South
+                normal = { x: 0, y: 1, z: 0 };
+                break;
+              case 3: // West
+                normal = { x: -1, y: 1, z: 0 };
+                break;
+              default:
+                normal = { x: 0, y: 1, z: 0 };
+            }
+
+            // Create the temporary step
+            const newTempStep = {
+              id: "temp-step",
+              x: x,
+              y: -1, // Ground level
+              z: y,
+              width: stepWidth * GRID_SIZE,
+              depth: 5 * GRID_SIZE, // Fixed depth
+              height: stepHeight,
+              rotation: stepRotation,
+              texture: "woodFloor", // Using an existing texture
+              normal: normal,
+            };
+
+            setTempStep(newTempStep);
+            setIsDrawingStep(true);
+
+            console.log("Step creation started - click again to place steps");
+          } else {
+            // Finish drawing the step
+            console.log("Attempting to finalize step creation");
+
+            if (tempStep) {
+              // Generate multiple steps
+              let newSteps = [];
+              const finalX = x; // Current click position
+              const finalZ = y; // Current click position
+
+              for (let i = 0; i < stepCount; i++) {
+                // Calculate the step position based on rotation
+                let stepX = tempStep.x; // Use the position of the temp step
+                let stepZ = tempStep.z;
+                const offset = i * stepWidth * GRID_SIZE;
+
+                switch (stepRotation) {
+                  case 0: // North
+                    stepZ -= offset;
+                    break;
+                  case 1: // East
+                    stepX += offset;
+                    break;
+                  case 2: // South
+                    stepZ += offset;
+                    break;
+                  case 3: // West
+                    stepX -= offset;
+                    break;
+                }
+
+                // Create a new step with decreasing height for each step
+                const newStep: Step = {
+                  id: `step-${Date.now()}-${i}`,
+                  x: stepX,
+                  y: -1, // Ground level
+                  z: stepZ,
+                  width: stepWidth * GRID_SIZE,
+                  depth: 5 * GRID_SIZE, // Fixed depth
+                  height: stepHeight - i * (stepHeight / stepCount),
+                  rotation: stepRotation,
+                  texture: "woodFloor", // Using an existing texture
+                  normal: tempStep.normal,
+                  roomId: "1",
+                };
+
+                newSteps.push(newStep);
+              }
+
+              console.log("Adding", newSteps.length, "new steps");
+              setSteps((prevSteps) => [...prevSteps, ...newSteps]);
+            }
+
+            // Reset drawing state
+            setIsDrawingStep(false);
+            setTempStep(null);
+          }
+          break;
+
         case "select":
           // Check if we clicked on a wall
           let clickedObject = false;
@@ -283,6 +494,22 @@ const FloorPlanEditor: React.FC = () => {
                   texture: floor.texture,
                   clickPoint: { x: mouseX, y: mouseY },
                   roomId: floor.roomId,
+                });
+                clickedObject = true;
+                break;
+              }
+            }
+          }
+
+          if (!clickedObject) {
+            for (const step of steps) {
+              if (isPointOnStep(mouseX, mouseY, step)) {
+                setSelectedObject({
+                  id: step.id,
+                  type: "step",
+                  texture: step.texture,
+                  clickPoint: { x: mouseX, y: mouseY },
+                  roomId: step.roomId,
                 });
                 clickedObject = true;
                 break;
@@ -457,6 +684,16 @@ const FloorPlanEditor: React.FC = () => {
           height,
           texture: "concreteFloor",
         });
+      } else if (mode === "addStep" && isDrawingStep && tempStep) {
+        // Snap mouse coordinates to grid
+        const { x, y } = snapToGrid(mouseX, mouseY);
+
+        // Update temp step position
+        setTempStep({
+          ...tempStep,
+          x: x,
+          z: y,
+        });
       }
     };
 
@@ -476,17 +713,33 @@ const FloorPlanEditor: React.FC = () => {
     startPoint,
     tempWall,
     tempFloor,
+    tempStep, // Add this
+    steps, // Add this
+    stepRotation, // Add this
+    stepWidth, // Add this
+    stepHeight, // Add this
+    stepCount, // Add this
+    isDrawingStep, // Add this
   ]);
 
+  // Update setModeAndResetDrawing function
   const setModeAndResetDrawing = (
-    newMode: "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint"
+    newMode:
+      | "select"
+      | "addWall"
+      | "addFloor"
+      | "addRoom"
+      | "spawnPoint"
+      | "addStep"
   ) => {
     setMode(newMode);
     // Reset all drawing states when switching modes
     setIsDrawingWall(false);
     setIsDrawingFloor(false);
+    setIsDrawingStep(false);
     setTempWall(null);
     setTempFloor(null);
+    setTempStep(null);
     setStartPoint(null);
   };
 
@@ -688,6 +941,14 @@ const FloorPlanEditor: React.FC = () => {
         >
           Add Wall
         </button>
+        <button
+          onClick={() => setModeAndResetDrawing("addStep")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "addStep" ? "bg-blue-200" : "bg-white"
+          }`}
+        >
+          Add Step
+        </button>
 
         <button
           onClick={() => setModeAndResetDrawing("addFloor")}
@@ -823,6 +1084,12 @@ const FloorPlanEditor: React.FC = () => {
                     (floor) => floor.id !== selectedObject.id
                   );
                   setFloors(newFloors);
+                }
+                if (selectedObject.type === "step") {
+                  const newSteps = steps.filter(
+                    (step) => step.id !== selectedObject.id
+                  );
+                  setSteps(newSteps);
                 }
                 setSelectedObject(null);
               }}
