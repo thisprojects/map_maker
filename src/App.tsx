@@ -40,7 +40,6 @@ const FloorPlanEditor: React.FC = () => {
   const [isDrawingStep, setIsDrawingStep] = useState(false);
   const [tempStep, setTempStep] = useState<Step | null>(null);
   const [stepRotation, setStepRotation] = useState<number>(0); // 0: North, 1: East, 2: South, 3: West
-  const [stepHeight, setStepHeight] = useState<number>(1.5);
   const [stepWidth, setStepWidth] = useState<number>(0.5);
   const [stepCount, setStepCount] = useState<number>(6);
 
@@ -103,6 +102,24 @@ const FloorPlanEditor: React.FC = () => {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      floors.forEach((floor) => {
+        ctx.fillStyle =
+          textureColors[floor.texture as keyof typeof textureColors];
+        ctx.fillRect(floor.x, floor.y, floor.width, floor.height);
+
+        // Draw floor border
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
+
+        // If selected, highlight with a different color
+        if (selectedObject && selectedObject.id === floor.id) {
+          ctx.strokeStyle = "#ffcc00";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
+        }
+      });
+
       // Draw grid if enabled
       if (showGrid) {
         ctx.strokeStyle = "#e0e0e0";
@@ -156,25 +173,6 @@ const FloorPlanEditor: React.FC = () => {
         }
 
         ctx.restore();
-      });
-
-      // Draw floors
-      floors.forEach((floor) => {
-        ctx.fillStyle =
-          textureColors[floor.texture as keyof typeof textureColors];
-        ctx.fillRect(floor.x, floor.y, floor.width, floor.height);
-
-        // Draw floor border
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
-
-        // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === floor.id) {
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
-        }
       });
 
       // Draw walls
@@ -304,7 +302,6 @@ const FloorPlanEditor: React.FC = () => {
     steps,
     stepRotation,
     stepWidth,
-    stepHeight,
     stepCount,
     isDrawingStep,
   ]);
@@ -421,7 +418,7 @@ const FloorPlanEditor: React.FC = () => {
               z: y,
               width: GRID_SIZE,
               depth: GRID_SIZE, // Fixed depth
-              height: stepHeight,
+              height: 0.25,
               rotation: stepRotation,
               texture: "woodFloor", // Using an existing texture
               normal: normal,
@@ -439,6 +436,12 @@ const FloorPlanEditor: React.FC = () => {
             if (tempStep) {
               // Generate multiple steps
               let newSteps = [];
+
+              let stepHeight = 1.5;
+
+              if (tempStep.rotation === 2) {
+                stepHeight = 0.25;
+              }
 
               for (let i = 0; i < stepCount; i++) {
                 // Calculate the step position based on rotation
@@ -479,7 +482,7 @@ const FloorPlanEditor: React.FC = () => {
                   z: stepZ,
                   width: width,
                   depth: depth, // Fixed depth
-                  height: stepHeight - i * (stepHeight / stepCount),
+                  height: stepHeight,
                   rotation: stepRotation,
                   texture: "woodFloor", // Using an existing texture
                   normal: tempStep.normal,
@@ -487,6 +490,13 @@ const FloorPlanEditor: React.FC = () => {
                 };
 
                 newSteps.push(newStep);
+
+                // decrease step height with each iteration
+                if (tempStep.rotation === 2) {
+                  stepHeight += 0.25;
+                } else {
+                  stepHeight -= 0.25;
+                }
               }
 
               console.log("Adding", newSteps.length, "new steps");
@@ -674,6 +684,8 @@ const FloorPlanEditor: React.FC = () => {
       }
     };
 
+    console.log("STEPS", steps);
+
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -794,7 +806,6 @@ const FloorPlanEditor: React.FC = () => {
     steps,
     stepRotation,
     stepWidth,
-    stepHeight,
     stepCount,
     isDrawingStep,
   ]);
@@ -913,6 +924,22 @@ const FloorPlanEditor: React.FC = () => {
         }
       });
 
+      const roomSteps = steps.map((step) => {
+        const roomStep = {
+          x: step.x * SCALE_FACTOR,
+          y: step.y,
+          z: step.z * SCALE_FACTOR,
+          width: step.width * SCALE_FACTOR,
+          depth: step.depth * SCALE_FACTOR,
+          height: step.height,
+          normal: step.normal,
+          rotation: step.rotation,
+          texture: "step",
+        };
+
+        return roomStep;
+      });
+
       const roomFloors = floors
         .map((floor) => {
           if (floor.roomId === room) {
@@ -935,7 +962,11 @@ const FloorPlanEditor: React.FC = () => {
         })
         .filter(Boolean);
 
-      return { walls: roomWalls.filter(Boolean), floors: roomFloors };
+      return {
+        walls: roomWalls.filter(Boolean),
+        floors: roomFloors,
+        steps: roomSteps,
+      };
     });
 
     // Scale spawn point if it exists
@@ -960,6 +991,7 @@ const FloorPlanEditor: React.FC = () => {
         { type: "floor", name: "floor", path: "FreeDoomFloor1.png" },
       ],
       rooms: roomList,
+      enemies: [],
       entities: [
         {
           type: "player",
