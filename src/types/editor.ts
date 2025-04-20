@@ -34,6 +34,13 @@ export interface SelectedObject {
   };
 }
 
+export interface SpawnPoint {
+  x: number;
+  rotation: number;
+  y: number;
+  z: number;
+}
+
 export interface Step {
   id: string;
   x: number;

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
-import { Floor, SelectedObject, Wall, Step } from "./types/editor";
-import { step } from "three/tsl";
+import { Floor, SelectedObject, Wall, Step, SpawnPoint } from "./types/editor";
 
 // Grid settings
 const GRID_SIZE = 50; // Size of each grid cell
@@ -17,7 +16,7 @@ const FloorPlanEditor: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
   const [walls, setWalls] = useState<Wall[]>(wallArray);
-  const [spawnPoint, setSpawnPoint] = useState({});
+  const [spawnPoint, setSpawnPoint] = useState<SpawnPoint | null>(null);
   const [floors, setFloors] = useState<Floor[]>(floorArray);
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
@@ -162,10 +161,10 @@ const FloorPlanEditor: React.FC = () => {
         // dir 2 = South: Draw from north to south (high Z to low Z)
         if (dir === "0") {
           // North stairs
-          stepsInGroup.sort((a, b) => b.z - a.z); // Ascending Z (south to north)
+          stepsInGroup.sort((a, b) => a.z - b.z); // Ascending Z (south to north)
         } else if (dir === "2") {
           // South stairs
-          stepsInGroup.sort((a, b) => a.z - b.z); // Descending Z (north to south)
+          stepsInGroup.sort((a, b) => b.z - a.z); // Descending Z (north to south)
         }
         // Add other directions (East/West) as needed
 
@@ -294,6 +293,15 @@ const FloorPlanEditor: React.FC = () => {
 
         ctx.restore();
       }
+
+      if (spawnPoint?.x) {
+        ctx.font = "25px Arial"; // Set font size and family
+        ctx.fillStyle = "red"; // Set text color
+
+        // Write text at specific coordinates (x, y)
+        ctx.fillText("P", spawnPoint.x, spawnPoint.z);
+        ctx.restore();
+      }
     };
 
     // Initial draw
@@ -332,6 +340,7 @@ const FloorPlanEditor: React.FC = () => {
     stepWidth,
     stepCount,
     isDrawingStep,
+    spawnPoint,
   ]);
 
   // Handle mouse events
@@ -714,7 +723,7 @@ const FloorPlanEditor: React.FC = () => {
           }
           break;
         case "spawnPoint":
-          setSpawnPoint({ x, z: y, y: 0, rotation: 0 });
+          setSpawnPoint({ x: mouseX, z: mouseY, y: 0, rotation: 0 });
           break;
       }
     };
