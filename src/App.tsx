@@ -39,9 +39,9 @@ const FloorPlanEditor: React.FC = () => {
   const [steps, setSteps] = useState<Step[]>([]);
   const [isDrawingStep, setIsDrawingStep] = useState(false);
   const [tempStep, setTempStep] = useState<Step | null>(null);
-  const [stepRotation, setStepRotation] = useState<number>(0); // 0: North, 1: East, 2: South, 3: West
-  const [stepWidth, setStepWidth] = useState<number>(0.5);
-  const [stepCount, setStepCount] = useState<number>(6);
+
+  const stepRotation: number = 0;
+  const stepCount: number = 6;
 
   // Map for textures - in a real app, we'd load image patterns
   const textureColors = {
@@ -336,9 +336,6 @@ const FloorPlanEditor: React.FC = () => {
     tempFloor,
     tempStep,
     steps,
-    stepRotation,
-    stepWidth,
-    stepCount,
     isDrawingStep,
     spawnPoint,
   ]);
@@ -526,7 +523,7 @@ const FloorPlanEditor: React.FC = () => {
                   width: width,
                   depth: depth, // Fixed depth
                   height: stepHeight,
-                  rotation: stepRotation,
+                  rotation: 0,
                   texture: "woodFloor", // Using an existing texture
                   normal: tempStep.normal,
                   dir,
@@ -848,9 +845,6 @@ const FloorPlanEditor: React.FC = () => {
     tempFloor,
     tempStep,
     steps,
-    stepRotation,
-    stepWidth,
-    stepCount,
     isDrawingStep,
   ]);
 
@@ -1015,7 +1009,7 @@ const FloorPlanEditor: React.FC = () => {
 
     // Scale spawn point if it exists
     const scaledSpawnPoint =
-      Object.keys(spawnPoint).length > 0
+      Object.keys(spawnPoint || []).length > 0
         ? {
             x: (spawnPoint as any).x * SCALE_FACTOR,
             y: (spawnPoint as any).y * SCALE_FACTOR,
