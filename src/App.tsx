@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
 import { Floor, SelectedObject, Wall, Step } from "./types/editor";
+import { step } from "three/tsl";
 
 // Grid settings
 const GRID_SIZE = 50; // Size of each grid cell
@@ -142,37 +143,64 @@ const FloorPlanEditor: React.FC = () => {
         }
       }
 
+      const stairGroups: { [key: string]: Step[] } = {};
+
       steps.forEach((step) => {
-        ctx.save();
-
-        // Translate to the center of the step
-        ctx.translate(step.x, step.z);
-
-        // Rotate based on step rotation
-        ctx.rotate((step.rotation * Math.PI) / 2);
-
-        // Fill with step texture color
-        ctx.fillStyle =
-          textureColors[step.texture as keyof typeof textureColors];
-
-        // Draw the step rectangle (moved back to account for the rotation around center)
-        const stepX = -step.width / 2;
-        const stepY = -step.depth / 2;
-        ctx.fillRect(stepX, stepY, step.width, step.depth);
-
-        // Draw step border
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(stepX, stepY, step.width, step.depth);
-
-        // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === step.id) {
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(stepX, stepY, step.width, step.depth);
+        const stepDirection = step.dir as number;
+        if (!isNaN(stepDirection)) {
+          if (!stairGroups[stepDirection]) {
+            stairGroups[stepDirection] = [];
+          }
+          stairGroups[stepDirection].push(step);
         }
+      });
 
-        ctx.restore();
+      // Process each group of stairs with the correct drawing order
+      Object.entries(stairGroups).forEach(([dir, stepsInGroup]) => {
+        // Sort based on direction
+        // dir 0 = North: Draw from south to north (low Z to high Z)
+        // dir 2 = South: Draw from north to south (high Z to low Z)
+        if (dir === "0") {
+          // North stairs
+          stepsInGroup.sort((a, b) => b.z - a.z); // Ascending Z (south to north)
+        } else if (dir === "2") {
+          // South stairs
+          stepsInGroup.sort((a, b) => a.z - b.z); // Descending Z (north to south)
+        }
+        // Add other directions (East/West) as needed
+
+        // Draw the sorted steps
+        stepsInGroup.forEach((step) => {
+          ctx.save();
+
+          // Translate to the center of the step
+          ctx.translate(step.x, step.z);
+
+          // Rotate based on step rotation
+          ctx.rotate((step.rotation * Math.PI) / 2);
+
+          // Fill with step texture color
+          ctx.fillStyle = "#d2b48c";
+
+          // Draw the step rectangle (moved back to account for the rotation around center)
+          const stepX = -step.width / 2;
+          const stepY = -step.depth / 2;
+          ctx.fillRect(stepX, stepY, step.width, step.depth);
+
+          // Draw step border
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(stepX, stepY, step.width, step.depth);
+
+          // If selected, highlight with a different color
+          if (selectedObject && selectedObject.id === step.id) {
+            ctx.strokeStyle = "#ffcc00";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(stepX, stepY, step.width, step.depth);
+          }
+
+          ctx.restore();
+        });
       });
 
       // Draw walls
@@ -259,7 +287,7 @@ const FloorPlanEditor: React.FC = () => {
         ctx.stroke();
 
         // Draw rotation angle text
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "black";
         ctx.font = "12px Arial";
         ctx.textAlign = "center";
         ctx.fillText(`${tempStep.rotation * 90}°`, 0, -tempStep.depth / 2 - 20);
@@ -450,27 +478,33 @@ const FloorPlanEditor: React.FC = () => {
                 const offset = (i * GRID_SIZE) / 7 + 7;
                 let width = 0;
                 let depth = 0;
+                let dir = 0;
 
                 switch (tempStep.rotation) {
                   case 0: // North
                     stepZ -= offset - GRID_SIZE / 2;
                     width = GRID_SIZE;
                     depth = 10;
+                    dir = 0;
+
                     break;
                   case 1: // East
                     stepX += offset - GRID_SIZE / 2;
                     width = 10;
                     depth = GRID_SIZE;
+                    dir = 1;
                     break;
                   case 2: // South
                     stepZ -= offset - GRID_SIZE / 2;
                     width = GRID_SIZE;
                     depth = 10;
+                    dir = 2;
                     break;
                   case 3: // West
                     stepX -= offset - GRID_SIZE / 2;
                     width = 10;
                     depth = GRID_SIZE;
+                    dir = 3;
                     break;
                 }
 
@@ -486,6 +520,7 @@ const FloorPlanEditor: React.FC = () => {
                   rotation: stepRotation,
                   texture: "woodFloor", // Using an existing texture
                   normal: tempStep.normal,
+                  dir,
                   roomId: "1",
                 };
 

@@ -44,6 +44,7 @@ export interface Step {
   height: number;
   rotation: number;
   texture: string;
+  dir?: number;
   normal: {
     x: number;
     y: number;
