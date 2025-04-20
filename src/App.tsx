@@ -419,8 +419,8 @@ const FloorPlanEditor: React.FC = () => {
               x: x,
               y: -1, // Ground level
               z: y,
-              width: stepWidth * GRID_SIZE,
-              depth: 5 * GRID_SIZE, // Fixed depth
+              width: GRID_SIZE,
+              depth: GRID_SIZE, // Fixed depth
               height: stepHeight,
               rotation: stepRotation,
               texture: "woodFloor", // Using an existing texture
@@ -439,27 +439,35 @@ const FloorPlanEditor: React.FC = () => {
             if (tempStep) {
               // Generate multiple steps
               let newSteps = [];
-              const finalX = x; // Current click position
-              const finalZ = y; // Current click position
 
               for (let i = 0; i < stepCount; i++) {
                 // Calculate the step position based on rotation
                 let stepX = tempStep.x; // Use the position of the temp step
                 let stepZ = tempStep.z;
-                const offset = i * stepWidth * GRID_SIZE;
+                const offset = (i * GRID_SIZE) / 7 + 7;
+                let width = 0;
+                let depth = 0;
 
                 switch (tempStep.rotation) {
                   case 0: // North
-                    stepZ -= offset;
+                    stepZ -= offset - GRID_SIZE / 2;
+                    width = GRID_SIZE;
+                    depth = 10;
                     break;
                   case 1: // East
-                    stepX += offset;
+                    stepX += offset - GRID_SIZE / 2;
+                    width = 10;
+                    depth = GRID_SIZE;
                     break;
                   case 2: // South
-                    stepZ += offset;
+                    stepZ -= offset - GRID_SIZE / 2;
+                    width = GRID_SIZE;
+                    depth = 10;
                     break;
                   case 3: // West
-                    stepX -= offset;
+                    stepX -= offset - GRID_SIZE / 2;
+                    width = 10;
+                    depth = GRID_SIZE;
                     break;
                 }
 
@@ -469,8 +477,8 @@ const FloorPlanEditor: React.FC = () => {
                   x: stepX,
                   y: -1, // Ground level
                   z: stepZ,
-                  width: stepWidth * GRID_SIZE,
-                  depth: 5 * GRID_SIZE, // Fixed depth
+                  width: width,
+                  depth: depth, // Fixed depth
                   height: stepHeight - i * (stepHeight / stepCount),
                   rotation: stepRotation,
                   texture: "woodFloor", // Using an existing texture
@@ -711,13 +719,13 @@ const FloorPlanEditor: React.FC = () => {
         });
       } else if (mode === "addStep" && isDrawingStep && tempStep) {
         // Snap mouse coordinates to grid
-        const { x, y } = snapToGrid(mouseX, mouseY);
+        // const { x, y } = snapToGrid(mouseX, mouseY);
 
         // Update temp step position
         setTempStep({
           ...tempStep,
-          x: x,
-          z: y,
+          x: mouseX,
+          z: mouseY,
         });
       }
     };
