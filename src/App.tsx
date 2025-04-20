@@ -307,12 +307,30 @@ const FloorPlanEditor: React.FC = () => {
     // Initial draw
     draw();
 
-    // Set up animation loop
-    const animate = () => {
-      draw();
+    // Set up animation loop with proper timing
+    let lastFrameTime = 0;
+    const targetFPS = 30; // Adjust this value as needed (lower = less CPU usage)
+    const frameInterval = 1000 / targetFPS;
+
+    const animate = (timestamp: number) => {
+      // Calculate time elapsed since last frame
+      const elapsed = timestamp - lastFrameTime;
+
+      // Only render if enough time has passed
+      if (elapsed > frameInterval) {
+        // Update last frame time, accounting for any excess time
+        lastFrameTime = timestamp - (elapsed % frameInterval);
+
+        // Perform drawing operation
+        draw();
+      }
+
+      // Schedule next frame
       requestAnimationFrame(animate);
     };
-    animate();
+
+    // Start animation loop
+    requestAnimationFrame(animate);
 
     // Handle window resize
     const handleResize = () => {
