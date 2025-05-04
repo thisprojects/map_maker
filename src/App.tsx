@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
-import { Floor, SelectedObject, Wall, Step, SpawnPoint } from "./types/editor";
+import {
+  Floor,
+  SelectedObject,
+  Wall,
+  Step,
+  SpawnPoint,
+  Block,
+} from "./types/editor";
 
 // Grid settings
 const GRID_SIZE = 50; // Size of each grid cell
@@ -15,29 +22,40 @@ const FloorPlanEditor: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
+
+  const [rooms, setRooms] = useState<string[]>(["1"]);
   const [walls, setWalls] = useState<Wall[]>(wallArray);
-  const [spawnPoint, setSpawnPoint] = useState<SpawnPoint | null>(null);
   const [floors, setFloors] = useState<Floor[]>(floorArray);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [spawnPoint, setSpawnPoint] = useState<SpawnPoint | null>(null);
+
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
     null
   );
-  const [rooms, setRooms] = useState<string[]>(["1"]);
   const [tempWall, setTempWall] = useState<Wall | null>(null);
+  const [tempBlock, setTempBlock] = useState<Block | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
     null
   );
 
   const [mode, setMode] = useState<
-    "select" | "addWall" | "addFloor" | "addRoom" | "spawnPoint" | "addStep"
+    | "select"
+    | "addWall"
+    | "addFloor"
+    | "addRoom"
+    | "spawnPoint"
+    | "addStep"
+    | "addBlock"
   >("select");
 
   const [showGrid, setShowGrid] = useState(true);
   const [tempFloor, setTempFloor] = useState<Floor | null>(null);
   const [isDrawingFloor, setIsDrawingFloor] = useState(false);
 
-  const [steps, setSteps] = useState<Step[]>([]);
   const [isDrawingStep, setIsDrawingStep] = useState(false);
+  const [isDrawingBlock, setIsDrawingBlock] = useState(false);
   const [tempStep, setTempStep] = useState<Step | null>(null);
 
   const stepRotation: number = 0;
@@ -202,6 +220,68 @@ const FloorPlanEditor: React.FC = () => {
         });
       });
 
+      // Draw blocks
+      blocks.forEach((block) => {
+        ctx.save();
+
+        // Translate to the center of the block
+        ctx.translate(block.x, block.z);
+
+        // Rotate based on block rotation
+        ctx.rotate((block.rotation * Math.PI) / 2);
+
+        // Fill with block texture color
+        ctx.fillStyle =
+          textureColors[block.texture as keyof typeof textureColors];
+
+        // Draw the block rectangle
+        const blockX = -block.width / 2;
+        const blockY = -block.depth / 2;
+        ctx.fillRect(blockX, blockY, block.width, block.depth);
+
+        // Draw block border
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(blockX, blockY, block.width, block.depth);
+
+        // If selected, highlight with a different color
+        if (selectedObject && selectedObject.id === block.id) {
+          ctx.strokeStyle = "#ffcc00";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(blockX, blockY, block.width, block.depth);
+        }
+
+        ctx.restore();
+      });
+
+      // Draw temporary block when in addBlock mode
+      if (tempBlock) {
+        ctx.save();
+
+        // Translate to the center of the block
+        ctx.translate(tempBlock.x, tempBlock.z);
+
+        // Rotate based on block rotation
+        ctx.rotate((tempBlock.rotation * Math.PI) / 2);
+
+        // Fill with semi-transparent color
+        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
+
+        // Draw the block rectangle
+        const blockX = -tempBlock.width / 2;
+        const blockY = -tempBlock.depth / 2;
+        ctx.fillRect(blockX, blockY, tempBlock.width, tempBlock.depth);
+
+        // Draw dashed border
+        ctx.strokeStyle = "#0088ff";
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(blockX, blockY, tempBlock.width, tempBlock.depth);
+        ctx.setLineDash([]);
+
+        ctx.restore();
+      }
+
       // Draw walls
       walls.forEach((wall) => {
         ctx.beginPath();
@@ -356,6 +436,9 @@ const FloorPlanEditor: React.FC = () => {
     steps,
     isDrawingStep,
     spawnPoint,
+    blocks,
+    isDrawingBlock,
+    tempBlock,
   ]);
 
   // Handle mouse events
@@ -383,6 +466,25 @@ const FloorPlanEditor: React.FC = () => {
       const withinBounds = x >= minX && x <= maxX && y >= minY && y <= maxY;
 
       return distance <= lineWidth && withinBounds;
+    };
+
+    const isPointOnBlock = (x: number, y: number, block: Block): boolean => {
+      // Convert mouse coordinates to the local coordinate system of the rotated block
+      const dx = x - block.x;
+      const dy = y - block.z;
+
+      // Rotate the point in the opposite direction of the block's rotation
+      const angle = (-block.rotation * Math.PI) / 2;
+      const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
+      const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
+
+      // Check if the rotated point is within the block bounds
+      return (
+        rotatedX >= -block.width / 2 &&
+        rotatedX <= block.width / 2 &&
+        rotatedY >= -block.depth / 2 &&
+        rotatedY <= block.depth / 2
+      );
     };
 
     // Add a helper function to check if a point is on a step
@@ -568,6 +670,67 @@ const FloorPlanEditor: React.FC = () => {
           }
           break;
 
+        case "addBlock":
+          if (!isDrawingBlock) {
+            // Start drawing the block
+            const escapeKeyHandler = (event: KeyboardEvent) => {
+              if (
+                event.key === "Escape" ||
+                event.key === "Esc" ||
+                event.keyCode === 27
+              ) {
+                setIsDrawingBlock(false);
+                setTempBlock(null);
+                setStartPoint(null);
+                console.log("Escape key was pressed - block creation canceled");
+                document.removeEventListener("keydown", escapeKeyHandler);
+              }
+            };
+
+            document.addEventListener("keydown", escapeKeyHandler);
+
+            // Start drawing block
+            setIsDrawingBlock(true);
+            setStartPoint({ x, y });
+            setTempBlock({
+              id: "temp-block",
+              x,
+              y: 0, // Default height of 0
+              z: y,
+              width: 0,
+              height: 1, // Default thickness of 1
+              depth: 0,
+              rotation: 0,
+              texture: "woodFloor",
+            });
+          } else {
+            // Finish drawing the block
+            setIsDrawingBlock(false);
+
+            if (tempBlock && startPoint) {
+              // Only add block if it has some minimum size
+              if (tempBlock.width > 20 && tempBlock.depth > 20) {
+                const newBlock: Block = {
+                  id: `block-${Date.now()}`,
+                  x: tempBlock.x,
+                  y: tempBlock.y,
+                  z: tempBlock.z,
+                  width: tempBlock.width,
+                  height: tempBlock.height,
+                  depth: tempBlock.depth,
+                  rotation: tempBlock.rotation,
+                  texture: "woodFloor",
+                  roomId: "1",
+                };
+                setBlocks([...blocks, newBlock]);
+              }
+            }
+
+            setTempBlock(null);
+            setStartPoint(null);
+          }
+          break;
+
         case "select":
           // Check if we clicked on a wall
           let clickedObject = false;
@@ -583,23 +746,6 @@ const FloorPlanEditor: React.FC = () => {
               });
               clickedObject = true;
               break;
-            }
-          }
-
-          // If not on a wall, check floors
-          if (!clickedObject) {
-            for (const floor of floors) {
-              if (isPointOnFloor(mouseX, mouseY, floor)) {
-                setSelectedObject({
-                  id: floor.id,
-                  type: "floor",
-                  texture: floor.texture,
-                  clickPoint: { x: mouseX, y: mouseY },
-                  roomId: floor.roomId,
-                });
-                clickedObject = true;
-                break;
-              }
             }
           }
 
@@ -619,11 +765,44 @@ const FloorPlanEditor: React.FC = () => {
             }
           }
 
+          if (!clickedObject) {
+            for (const block of blocks) {
+              if (isPointOnBlock(mouseX, mouseY, block)) {
+                setSelectedObject({
+                  id: block.id,
+                  type: "block",
+                  texture: block.texture,
+                  clickPoint: { x: mouseX, y: mouseY },
+                  roomId: block.roomId,
+                });
+                clickedObject = true;
+                break;
+              }
+            }
+          }
+
+          if (!clickedObject) {
+            for (const floor of floors) {
+              if (isPointOnFloor(mouseX, mouseY, floor)) {
+                setSelectedObject({
+                  id: floor.id,
+                  type: "floor",
+                  texture: floor.texture,
+                  clickPoint: { x: mouseX, y: mouseY },
+                  roomId: floor.roomId,
+                });
+                clickedObject = true;
+                break;
+              }
+            }
+          }
+
           // Clear selection if clicked on empty space
           if (!clickedObject) {
             setSelectedObject(null);
           }
           break;
+
         case "addWall":
           if (!isDrawingWall) {
             const escapeKeyHandler = (event: KeyboardEvent) => {
@@ -743,8 +922,6 @@ const FloorPlanEditor: React.FC = () => {
       }
     };
 
-    console.log("STEPS", steps);
-
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -797,6 +974,26 @@ const FloorPlanEditor: React.FC = () => {
           ...tempStep,
           x: mouseX,
           z: mouseY,
+        });
+      } else if (mode === "addBlock" && isDrawingBlock && startPoint) {
+        // Snap mouse coordinates to grid
+        const { x, y } = snapToGrid(mouseX, mouseY);
+
+        // Calculate width and depth (ensure they're positive)
+        const width = Math.abs(x - startPoint.x);
+        const depth = Math.abs(y - startPoint.y);
+
+        // Calculate the position of the block (center)
+        const blockX = (startPoint.x + x) / 2;
+        const blockZ = (startPoint.y + y) / 2;
+
+        // Update temp block
+        setTempBlock({
+          ...tempBlock!,
+          x: blockX,
+          z: blockZ,
+          width: width,
+          depth: depth,
         });
       }
     };
@@ -857,6 +1054,9 @@ const FloorPlanEditor: React.FC = () => {
     floors,
     mode,
     isDrawingWall,
+    blocks,
+    isDrawingBlock,
+    tempBlock,
     isDrawingFloor,
     startPoint,
     tempWall,
@@ -875,13 +1075,16 @@ const FloorPlanEditor: React.FC = () => {
       | "addRoom"
       | "spawnPoint"
       | "addStep"
+      | "addBlock"
   ) => {
     setMode(newMode);
     // Reset all drawing states when switching modes
     setIsDrawingWall(false);
     setIsDrawingFloor(false);
     setIsDrawingStep(false);
+    setIsDrawingBlock(false);
     setTempWall(null);
+    setTempBlock(null);
     setTempFloor(null);
     setTempStep(null);
     setStartPoint(null);
@@ -996,6 +1199,23 @@ const FloorPlanEditor: React.FC = () => {
         return roomStep;
       });
 
+      const roomBlocks = blocks
+        .map((block) => {
+          if (block.roomId === room) {
+            return {
+              x: block.x * SCALE_FACTOR,
+              y: block.y,
+              z: block.z * SCALE_FACTOR,
+              width: block.width * SCALE_FACTOR,
+              depth: block.depth * SCALE_FACTOR,
+              height: block.height,
+              rotation: block.rotation,
+              texture: "block",
+            };
+          }
+        })
+        .filter(Boolean);
+
       const roomFloors = floors
         .map((floor) => {
           if (floor.roomId === room) {
@@ -1022,6 +1242,7 @@ const FloorPlanEditor: React.FC = () => {
         walls: roomWalls.filter(Boolean),
         floors: roomFloors,
         steps: roomSteps,
+        blocks: roomBlocks,
       };
     });
 
@@ -1123,6 +1344,14 @@ const FloorPlanEditor: React.FC = () => {
         >
           Add Floor
         </button>
+        <button
+          onClick={() => setModeAndResetDrawing("addBlock")}
+          className={`text-black border border-white rounded p-2 cursor-pointer ${
+            mode === "addBlock" ? "bg-blue-200" : "bg-white"
+          }`}
+        >
+          Add Block
+        </button>
         <div className="flex flex-col">
           <button
             onClick={() =>
@@ -1158,7 +1387,7 @@ const FloorPlanEditor: React.FC = () => {
           className="text-black border border-white rounded p-2 cursor-pointer bg-white"
           onClick={saveMap}
         >
-          Save Map (1/10 Scale)
+          Export Map (1/10 Scale)
         </button>
 
         <button
@@ -1256,6 +1485,14 @@ const FloorPlanEditor: React.FC = () => {
                   );
                   setSteps(newSteps);
                 }
+
+                if (selectedObject.type === "block") {
+                  const newBlocks = blocks.filter(
+                    (block) => block.id !== selectedObject.id
+                  );
+                  setBlocks(newBlocks);
+                }
+
                 setSelectedObject(null);
               }}
             >

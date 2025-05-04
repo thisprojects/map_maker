@@ -21,7 +21,7 @@ export interface Floor {
 
 export interface SelectedObject {
   id: string;
-  type: "wall" | "floor" | "step";
+  type: "wall" | "floor" | "step" | "block";
   texture: string;
   roomId?: string;
   position?: {
@@ -57,5 +57,18 @@ export interface Step {
     y: number;
     z: number;
   };
+  roomId?: string;
+}
+
+export interface Block {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+  depth: number;
+  rotation: number;
+  texture: string;
   roomId?: string;
 }
