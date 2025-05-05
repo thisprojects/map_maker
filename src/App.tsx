@@ -1266,6 +1266,7 @@ const FloorPlanEditor: React.FC = () => {
         { type: "wall", name: "east", path: "FreeDoomWall2.png" },
         { type: "wall", name: "west", path: "FreeDoomWall2.png" },
         { type: "floor", name: "floor", path: "FreeDoomFloor1.png" },
+        { type: "block", name: "block", path: "FreeDoomFloor2.png" },
       ],
       rooms: roomList,
       enemies: [],
