@@ -1,42 +1,79 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
-import {
-  Floor,
-  SelectedObject,
-  Wall,
-  Step,
-  SpawnPoint,
-  Block,
-} from "./types/editor";
-
-// Grid settings
-const GRID_SIZE = 50; // Size of each grid cell
-const SCALE_FACTOR = 0.1; // Scale factor to reduce the map size to 1/10th
+import useWalls from "./hooks/useWalls";
+import { Floor, SelectedObject, Wall, Step, Block } from "./types/editor";
+import useFloors from "./hooks/useFloors";
+import useSteps from "./hooks/useSteps";
+import useBlocks from "./hooks/useBlocks";
+import useLevel from "./hooks/useLevel";
+import useDrawingTools from "./hooks/useDrawingTools";
 
 // Initial data
-const wallArray: Wall[] = [];
-
-const floorArray: Floor[] = [];
 
 const FloorPlanEditor: React.FC = () => {
+  const {
+    setWalls,
+    walls,
+    tempWall,
+    setTempWall,
+    isDrawingWall,
+    setIsDrawingWall,
+  } = useWalls();
+
+  const {
+    setFloors,
+    floors,
+    tempFloor,
+    setTempFloor,
+    isDrawingFloor,
+    setIsDrawingFloor,
+  } = useFloors();
+
+  const {
+    setSteps,
+    steps,
+    tempStep,
+    setTempStep,
+    isDrawingStep,
+    setIsDrawingStep,
+    stepRotation,
+    stepCount,
+  } = useSteps();
+
+  const {
+    setBlocks,
+    blocks,
+    setTempBlock,
+    tempBlock,
+    isDrawingBlock,
+    setIsDrawingBlock,
+  } = useBlocks();
+
+  const {
+    showRoomPicker,
+    setShowRoomPicker,
+    rooms,
+    setRooms,
+    spawnPoint,
+    setSpawnPoint,
+    startPoint,
+    setStartPoint,
+    textureColors,
+  } = useLevel();
+
+  const {
+    enforceAngle,
+    snapToGrid,
+    showGrid,
+    setShowGrid,
+    GRID_SIZE,
+    SCALE_FACTOR,
+  } = useDrawingTools();
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
-
-  const [rooms, setRooms] = useState<string[]>(["1"]);
-  const [walls, setWalls] = useState<Wall[]>(wallArray);
-  const [floors, setFloors] = useState<Floor[]>(floorArray);
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [spawnPoint, setSpawnPoint] = useState<SpawnPoint | null>(null);
 
   const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
-    null
-  );
-  const [tempWall, setTempWall] = useState<Wall | null>(null);
-  const [tempBlock, setTempBlock] = useState<Block | null>(null);
-  const [isDrawingWall, setIsDrawingWall] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
     null
   );
 
@@ -49,59 +86,6 @@ const FloorPlanEditor: React.FC = () => {
     | "addStep"
     | "addBlock"
   >("select");
-
-  const [showGrid, setShowGrid] = useState(true);
-  const [tempFloor, setTempFloor] = useState<Floor | null>(null);
-  const [isDrawingFloor, setIsDrawingFloor] = useState(false);
-
-  const [isDrawingStep, setIsDrawingStep] = useState(false);
-  const [isDrawingBlock, setIsDrawingBlock] = useState(false);
-  const [tempStep, setTempStep] = useState<Step | null>(null);
-
-  const stepRotation: number = 0;
-  const stepCount: number = 6;
-
-  // Map for textures - in a real app, we'd load image patterns
-  const textureColors = {
-    brickWall: "#a52a2a",
-    concreteFloor: "#cccccc",
-    woodFloor: "#d2b48c",
-    tileFloor: "#add8e6",
-  };
-
-  // Function to snap point to grid
-  const snapToGrid = (x: number, y: number) => {
-    return {
-      x: Math.round(x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(y / GRID_SIZE) * GRID_SIZE,
-    };
-  };
-
-  // Function to enforce 45-degree angles for walls
-  const enforceAngle = (x1: number, y1: number, x2: number, y2: number) => {
-    const dx = x2 - x1;
-    const dy = y1 - y2; // Note: y is inverted in canvas (0 is at top)
-    const length = Math.sqrt(dx * dx + dy * dy);
-
-    // Calculate angle (in radians) - note we're using arctangent
-    let angle = Math.atan2(dy, dx);
-
-    // Normalize angle to [0, 2π]
-    if (angle < 0) {
-      angle += 2 * Math.PI;
-    }
-
-    // Snap to nearest 45 degrees (π/4)
-    const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
-
-    // Calculate new end coordinates
-    // Remember to invert y again for canvas coordinates
-    const newX = x1 + length * Math.cos(snapAngle);
-    const newY = y1 - length * Math.sin(snapAngle);
-
-    // Snap to grid
-    return snapToGrid(newX, newY);
-  };
 
   // Initialize canvas
   useEffect(() => {
