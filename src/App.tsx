@@ -7,6 +7,8 @@ import useSteps from "./hooks/useSteps";
 import useBlocks from "./hooks/useBlocks";
 import useLevel from "./hooks/useLevel";
 import useDrawingTools from "./hooks/useDrawingTools";
+import { GRID_SIZE, SCALE_FACTOR } from "./constants/constants";
+import Draw from "./classes/Draw";
 
 // Initial data
 
@@ -61,14 +63,7 @@ const FloorPlanEditor: React.FC = () => {
     textureColors,
   } = useLevel();
 
-  const {
-    enforceAngle,
-    snapToGrid,
-    showGrid,
-    setShowGrid,
-    GRID_SIZE,
-    SCALE_FACTOR,
-  } = useDrawingTools();
+  const { enforceAngle, snapToGrid, showGrid, setShowGrid } = useDrawingTools();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -95,281 +90,24 @@ const FloorPlanEditor: React.FC = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas dimensions
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // Draw function
-    const draw = () => {
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      floors.forEach((floor) => {
-        ctx.fillStyle =
-          textureColors[floor.texture as keyof typeof textureColors];
-        ctx.fillRect(floor.x, floor.y, floor.width, floor.height);
-
-        // Draw floor border
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
-
-        // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === floor.id) {
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
-        }
-      });
-
-      // Draw grid if enabled
-      if (showGrid) {
-        ctx.strokeStyle = "#e0e0e0";
-        ctx.lineWidth = 0.5;
-
-        // Draw vertical grid lines
-        for (let x = 0; x < canvas.width; x += GRID_SIZE) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvas.height);
-          ctx.stroke();
-        }
-
-        // Draw horizontal grid lines
-        for (let y = 0; y < canvas.height; y += GRID_SIZE) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
-        }
-      }
-
-      const stairGroups: { [key: string]: Step[] } = {};
-
-      steps.forEach((step) => {
-        const stepDirection = step.dir as number;
-        if (!isNaN(stepDirection)) {
-          if (!stairGroups[stepDirection]) {
-            stairGroups[stepDirection] = [];
-          }
-          stairGroups[stepDirection].push(step);
-        }
-      });
-
-      // Process each group of stairs with the correct drawing order
-      Object.entries(stairGroups).forEach(([dir, stepsInGroup]) => {
-        // Sort based on direction
-        // dir 0 = North: Draw from south to north (low Z to high Z)
-        // dir 2 = South: Draw from north to south (high Z to low Z)
-        if (dir === "0") {
-          // North stairs
-          stepsInGroup.sort((a, b) => a.z - b.z); // Ascending Z (south to north)
-        } else if (dir === "2") {
-          // South stairs
-          stepsInGroup.sort((a, b) => b.z - a.z); // Descending Z (north to south)
-        }
-        // Add other directions (East/West) as needed
-
-        // Draw the sorted steps
-        stepsInGroup.forEach((step) => {
-          ctx.save();
-
-          // Translate to the center of the step
-          ctx.translate(step.x, step.z);
-
-          // Rotate based on step rotation
-          ctx.rotate((step.rotation * Math.PI) / 2);
-
-          // Fill with step texture color
-          ctx.fillStyle = "#d2b48c";
-
-          // Draw the step rectangle (moved back to account for the rotation around center)
-          const stepX = -step.width / 2;
-          const stepY = -step.depth / 2;
-          ctx.fillRect(stepX, stepY, step.width, step.depth);
-
-          // Draw step border
-          ctx.strokeStyle = "#000";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(stepX, stepY, step.width, step.depth);
-
-          // If selected, highlight with a different color
-          if (selectedObject && selectedObject.id === step.id) {
-            ctx.strokeStyle = "#ffcc00";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(stepX, stepY, step.width, step.depth);
-          }
-
-          ctx.restore();
-        });
-      });
-
-      // Draw blocks
-      blocks.forEach((block) => {
-        ctx.save();
-
-        // Translate to the center of the block
-        ctx.translate(block.x, block.z);
-
-        // Rotate based on block rotation
-        ctx.rotate((block.rotation * Math.PI) / 2);
-
-        // Fill with block texture color
-        ctx.fillStyle =
-          textureColors[block.texture as keyof typeof textureColors];
-
-        // Draw the block rectangle
-        const blockX = -block.width / 2;
-        const blockY = -block.depth / 2;
-        ctx.fillRect(blockX, blockY, block.width, block.depth);
-
-        // Draw block border
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(blockX, blockY, block.width, block.depth);
-
-        // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === block.id) {
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(blockX, blockY, block.width, block.depth);
-        }
-
-        ctx.restore();
-      });
-
-      // Draw temporary block when in addBlock mode
-      if (tempBlock) {
-        ctx.save();
-
-        // Translate to the center of the block
-        ctx.translate(tempBlock.x, tempBlock.z);
-
-        // Rotate based on block rotation
-        ctx.rotate((tempBlock.rotation * Math.PI) / 2);
-
-        // Fill with semi-transparent color
-        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
-
-        // Draw the block rectangle
-        const blockX = -tempBlock.width / 2;
-        const blockY = -tempBlock.depth / 2;
-        ctx.fillRect(blockX, blockY, tempBlock.width, tempBlock.depth);
-
-        // Draw dashed border
-        ctx.strokeStyle = "#0088ff";
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 2;
-        ctx.strokeRect(blockX, blockY, tempBlock.width, tempBlock.depth);
-        ctx.setLineDash([]);
-
-        ctx.restore();
-      }
-
-      // Draw walls
-      walls.forEach((wall) => {
-        ctx.beginPath();
-        ctx.moveTo(wall.x1, wall.y1);
-        ctx.lineTo(wall.x2, wall.y2);
-        ctx.strokeStyle =
-          textureColors[wall.texture as keyof typeof textureColors];
-        ctx.lineWidth = 10;
-        ctx.stroke();
-
-        // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === wall.id) {
-          ctx.strokeStyle = "#ffcc00";
-          ctx.lineWidth = 12;
-          ctx.stroke();
-        }
-      });
-
-      // Draw temporary wall when in addWall mode
-      if (tempWall) {
-        ctx.beginPath();
-        ctx.moveTo(tempWall.x1, tempWall.y1);
-        ctx.lineTo(tempWall.x2, tempWall.y2);
-        ctx.strokeStyle = "#0088ff";
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 8;
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      // Draw temporary floor when in addFloor mode
-      if (tempFloor) {
-        ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
-        ctx.fillRect(
-          tempFloor.x,
-          tempFloor.y,
-          tempFloor.width,
-          tempFloor.height
-        );
-        ctx.strokeStyle = "#0088ff";
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          tempFloor.x,
-          tempFloor.y,
-          tempFloor.width,
-          tempFloor.height
-        );
-        ctx.setLineDash([]);
-      }
-      if (tempStep) {
-        ctx.save();
-
-        // Translate to the center of the step
-        ctx.translate(tempStep.x, tempStep.z);
-
-        // Rotate based on step rotation
-        ctx.rotate((tempStep.rotation * Math.PI) / 2);
-
-        // Fill with step texture color
-        ctx.fillStyle =
-          textureColors[tempStep.texture as keyof typeof textureColors];
-
-        // Draw the step rectangle
-        const stepX = -tempStep.width / 2;
-        const stepY = -tempStep.depth / 2;
-        ctx.fillRect(stepX, stepY, tempStep.width, tempStep.depth);
-
-        // Draw step border with dashed line to indicate it's temporary
-        ctx.strokeStyle = "#0088ff";
-        ctx.setLineDash([5, 5]);
-        ctx.lineWidth = 2;
-        ctx.strokeRect(stepX, stepY, tempStep.width, tempStep.depth);
-
-        // Add rotation indicator
-        ctx.strokeStyle = "#ff3300";
-        ctx.setLineDash([]);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(0, -tempStep.depth / 2 - 15);
-        ctx.stroke();
-
-        // Draw rotation angle text
-        ctx.fillStyle = "black";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(`${tempStep.rotation * 90}°`, 0, -tempStep.depth / 2 - 20);
-
-        ctx.restore();
-      }
-
-      if (spawnPoint?.x) {
-        ctx.font = "25px Arial"; // Set font size and family
-        ctx.fillStyle = "red"; // Set text color
-
-        // Write text at specific coordinates (x, y)
-        ctx.fillText("P", spawnPoint.x, spawnPoint.z);
-        ctx.restore();
-      }
-    };
+    const screen = new Draw({
+      canvas,
+      floors,
+      steps,
+      blocks,
+      walls,
+      selectedObject,
+      textureColors,
+      showGrid,
+      tempStep,
+      tempWall,
+      tempBlock,
+      tempFloor,
+      spawnPoint,
+    });
 
     // Initial draw
-    draw();
+    screen.draw();
 
     // Set up animation loop with proper timing
     let lastFrameTime = 0;
@@ -386,7 +124,7 @@ const FloorPlanEditor: React.FC = () => {
         lastFrameTime = timestamp - (elapsed % frameInterval);
 
         // Perform drawing operation
-        draw();
+        screen.draw();
       }
 
       // Schedule next frame
@@ -400,7 +138,7 @@ const FloorPlanEditor: React.FC = () => {
     const handleResize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      draw();
+      screen.draw();
     };
     window.addEventListener("resize", handleResize);
 

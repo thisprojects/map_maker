@@ -1,9 +1,69 @@
-export class Draw {
+import { GRID_SIZE } from "../constants/constants";
+import { Block, Floor, Step, Wall } from "../types/editor";
+
+export interface IDrawOptions {
+  canvas: HTMLCanvasElement;
+  floors: Floor[];
+  steps: Step[];
+  blocks: Block[];
+  walls: Wall[];
+  selectedObject;
+  textureColors;
+  showGrid;
+  tempStep;
+  tempWall;
+  tempBlock;
+  tempFloor;
+  spawnPoint;
+}
+
+export default class Draw {
   private ctx;
   private canvas: HTMLCanvasElement;
+  private floors: Floor[];
+  private steps: Step[];
+  private blocks: Block[];
+  private walls: Wall[];
+  private selectedObject;
+  private textureColours;
+  private showGrid;
+  private tempWall;
+  private tempBlock;
+  private tempStep;
+  private tempFloor;
+  private spawnPoint;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor({
+    canvas,
+    floors,
+    steps,
+    blocks,
+    walls,
+    selectedObject,
+    textureColors,
+    showGrid,
+    tempStep,
+    tempWall,
+    tempBlock,
+    tempFloor,
+    spawnPoint,
+  }: IDrawOptions) {
     this.canvas = canvas as HTMLCanvasElement;
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+
+    this.textureColours = textureColors;
+    this.selectedObject = selectedObject;
+    this.showGrid = showGrid;
+    this.tempStep = tempStep;
+    this.tempBlock = tempBlock;
+    this.tempWall = tempWall;
+    this.tempFloor = tempFloor;
+    this.spawnPoint = spawnPoint;
+    this.floors = floors;
+    this.steps = steps;
+    this.blocks = blocks;
+    this.walls = walls;
     const context = this.canvas.getContext("2d");
     if (!context) {
       throw new Error("Unable to get 2D context from canvas");
@@ -15,9 +75,9 @@ export class Draw {
     // Clear canvas
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    floors.forEach((floor) => {
+    this.floors.forEach((floor: Floor) => {
       this.ctx.fillStyle =
-        textureColors[floor.texture as keyof typeof textureColors];
+        this.textureColours[floor.texture as keyof typeof this.textureColours];
       this.ctx.fillRect(floor.x, floor.y, floor.width, floor.height);
 
       // Draw floor border
@@ -26,7 +86,7 @@ export class Draw {
       this.ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
 
       // If selected, highlight with a different color
-      if (selectedObject && selectedObject.id === floor.id) {
+      if (this.selectedObject && this.selectedObject.id === floor.id) {
         this.ctx.strokeStyle = "#ffcc00";
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(floor.x, floor.y, floor.width, floor.height);
@@ -34,7 +94,7 @@ export class Draw {
     });
 
     // Draw grid if enabled
-    if (showGrid) {
+    if (this.showGrid) {
       this.ctx.strokeStyle = "#e0e0e0";
       this.ctx.lineWidth = 0.5;
 
@@ -57,7 +117,7 @@ export class Draw {
 
     const stairGroups: { [key: string]: Step[] } = {};
 
-    steps.forEach((step) => {
+    this.steps.forEach((step: Step) => {
       const stepDirection = step.dir as number;
       if (!isNaN(stepDirection)) {
         if (!stairGroups[stepDirection]) {
@@ -105,7 +165,7 @@ export class Draw {
         this.ctx.strokeRect(stepX, stepY, step.width, step.depth);
 
         // If selected, highlight with a different color
-        if (selectedObject && selectedObject.id === step.id) {
+        if (this.selectedObject && this.selectedObject.id === step.id) {
           this.ctx.strokeStyle = "#ffcc00";
           this.ctx.lineWidth = 2;
           this.ctx.strokeRect(stepX, stepY, step.width, step.depth);
@@ -116,7 +176,7 @@ export class Draw {
     });
 
     // Draw blocks
-    blocks.forEach((block) => {
+    this.blocks.forEach((block: Block) => {
       this.ctx.save();
 
       // Translate to the center of the block
@@ -127,7 +187,7 @@ export class Draw {
 
       // Fill with block texture color
       this.ctx.fillStyle =
-        textureColors[block.texture as keyof typeof textureColors];
+        this.textureColours[block.texture as keyof typeof this.textureColours];
 
       // Draw the block rectangle
       const blockX = -block.width / 2;
@@ -140,7 +200,7 @@ export class Draw {
       this.ctx.strokeRect(blockX, blockY, block.width, block.depth);
 
       // If selected, highlight with a different color
-      if (selectedObject && selectedObject.id === block.id) {
+      if (this.selectedObject && this.selectedObject.id === block.id) {
         this.ctx.strokeStyle = "#ffcc00";
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(blockX, blockY, block.width, block.depth);
@@ -150,45 +210,55 @@ export class Draw {
     });
 
     // Draw temporary block when in addBlock mode
-    if (tempBlock) {
+    if (this.tempBlock) {
       this.ctx.save();
 
       // Translate to the center of the block
-      this.ctx.translate(tempBlock.x, tempBlock.z);
+      this.ctx.translate(this.tempBlock.x, this.tempBlock.z);
 
       // Rotate based on block rotation
-      this.ctx.rotate((tempBlock.rotation * Math.PI) / 2);
+      this.ctx.rotate((this.tempBlock.rotation * Math.PI) / 2);
 
       // Fill with semi-transparent color
       this.ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
 
       // Draw the block rectangle
-      const blockX = -tempBlock.width / 2;
-      const blockY = -tempBlock.depth / 2;
-      this.ctx.fillRect(blockX, blockY, tempBlock.width, tempBlock.depth);
+      const blockX = -this.tempBlock.width / 2;
+      const blockY = -this.tempBlock.depth / 2;
+      this.ctx.fillRect(
+        blockX,
+        blockY,
+        this.tempBlock.width,
+        this.tempBlock.depth
+      );
 
       // Draw dashed border
       this.ctx.strokeStyle = "#0088ff";
       this.ctx.setLineDash([5, 5]);
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(blockX, blockY, tempBlock.width, tempBlock.depth);
+      this.ctx.strokeRect(
+        blockX,
+        blockY,
+        this.tempBlock.width,
+        this.tempBlock.depth
+      );
       this.ctx.setLineDash([]);
 
       this.ctx.restore();
     }
 
     // Draw walls
-    walls.forEach((wall) => {
+    this.walls.forEach((wall: Wall) => {
       this.ctx.beginPath();
       this.ctx.moveTo(wall.x1, wall.y1);
       this.ctx.lineTo(wall.x2, wall.y2);
       this.ctx.strokeStyle =
-        textureColors[wall.texture as keyof typeof textureColors];
+        this.textureColours[wall.texture as keyof typeof this.textureColours];
       this.ctx.lineWidth = 10;
       this.ctx.stroke();
 
       // If selected, highlight with a different color
-      if (selectedObject && selectedObject.id === wall.id) {
+      if (this.selectedObject && this.selectedObject.id === wall.id) {
         this.ctx.strokeStyle = "#ffcc00";
         this.ctx.lineWidth = 12;
         this.ctx.stroke();
@@ -196,10 +266,10 @@ export class Draw {
     });
 
     // Draw temporary wall when in addWall mode
-    if (tempWall) {
+    if (this.tempWall) {
       this.ctx.beginPath();
-      this.ctx.moveTo(tempWall.x1, tempWall.y1);
-      this.ctx.lineTo(tempWall.x2, tempWall.y2);
+      this.ctx.moveTo(this.tempWall.x1, this.tempWall.y1);
+      this.ctx.lineTo(this.tempWall.x2, this.tempWall.y2);
       this.ctx.strokeStyle = "#0088ff";
       this.ctx.setLineDash([5, 5]);
       this.ctx.lineWidth = 8;
@@ -208,48 +278,55 @@ export class Draw {
     }
 
     // Draw temporary floor when in addFloor mode
-    if (tempFloor) {
+    if (this.tempFloor) {
       this.ctx.fillStyle = "rgba(0, 136, 255, 0.3)";
       this.ctx.fillRect(
-        tempFloor.x,
-        tempFloor.y,
-        tempFloor.width,
-        tempFloor.height
+        this.tempFloor.x,
+        this.tempFloor.y,
+        this.tempFloor.width,
+        this.tempFloor.height
       );
       this.ctx.strokeStyle = "#0088ff";
       this.ctx.setLineDash([5, 5]);
       this.ctx.lineWidth = 2;
       this.ctx.strokeRect(
-        tempFloor.x,
-        tempFloor.y,
-        tempFloor.width,
-        tempFloor.height
+        this.tempFloor.x,
+        this.tempFloor.y,
+        this.tempFloor.width,
+        this.tempFloor.height
       );
       this.ctx.setLineDash([]);
     }
-    if (tempStep) {
+    if (this.tempStep) {
       this.ctx.save();
 
       // Translate to the center of the step
-      this.ctx.translate(tempStep.x, tempStep.z);
+      this.ctx.translate(this.tempStep.x, this.tempStep.z);
 
       // Rotate based on step rotation
-      this.ctx.rotate((tempStep.rotation * Math.PI) / 2);
+      this.ctx.rotate((this.tempStep.rotation * Math.PI) / 2);
 
       // Fill with step texture color
       this.ctx.fillStyle =
-        textureColors[tempStep.texture as keyof typeof textureColors];
+        this.textureColours[
+          this.tempStep.texture as keyof typeof this.textureColours
+        ];
 
       // Draw the step rectangle
-      const stepX = -tempStep.width / 2;
-      const stepY = -tempStep.depth / 2;
-      this.ctx.fillRect(stepX, stepY, tempStep.width, tempStep.depth);
+      const stepX = -this.tempStep.width / 2;
+      const stepY = -this.tempStep.depth / 2;
+      this.ctx.fillRect(stepX, stepY, this.tempStep.width, this.tempStep.depth);
 
       // Draw step border with dashed line to indicate it's temporary
       this.ctx.strokeStyle = "#0088ff";
       this.ctx.setLineDash([5, 5]);
       this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(stepX, stepY, tempStep.width, tempStep.depth);
+      this.ctx.strokeRect(
+        stepX,
+        stepY,
+        this.tempStep.width,
+        this.tempStep.depth
+      );
 
       // Add rotation indicator
       this.ctx.strokeStyle = "#ff3300";
@@ -257,7 +334,7 @@ export class Draw {
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
       this.ctx.moveTo(0, 0);
-      this.ctx.lineTo(0, -tempStep.depth / 2 - 15);
+      this.ctx.lineTo(0, -this.tempStep.depth / 2 - 15);
       this.ctx.stroke();
 
       // Draw rotation angle text
@@ -265,20 +342,20 @@ export class Draw {
       this.ctx.font = "12px Arial";
       this.ctx.textAlign = "center";
       this.ctx.fillText(
-        `${tempStep.rotation * 90}°`,
+        `${this.tempStep.rotation * 90}°`,
         0,
-        -tempStep.depth / 2 - 20
+        -this.tempStep.depth / 2 - 20
       );
 
       this.ctx.restore();
     }
 
-    if (spawnPoint?.x) {
+    if (this.spawnPoint?.x) {
       this.ctx.font = "25px Arial"; // Set font size and family
       this.ctx.fillStyle = "red"; // Set text color
 
       // Write text at specific coordinates (x, y)
-      this.ctx.fillText("P", spawnPoint.x, spawnPoint.z);
+      this.ctx.fillText("P", this.spawnPoint.x, this.spawnPoint.z);
       this.ctx.restore();
     }
   }

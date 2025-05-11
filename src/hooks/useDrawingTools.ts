@@ -1,10 +1,8 @@
 import { useState } from "react";
+import { GRID_SIZE } from "../constants/constants";
 
 const useDrawingTools = () => {
   const [showGrid, setShowGrid] = useState(true);
-
-  const GRID_SIZE = 50; // Size of each grid cell
-  const SCALE_FACTOR = 0.1; // Scale factor to reduce the map size to 1/10th
 
   // Function to snap point to grid
   const snapToGrid = (x: number, y: number) => {
@@ -45,8 +43,6 @@ const useDrawingTools = () => {
     snapToGrid,
     showGrid,
     setShowGrid,
-    GRID_SIZE,
-    SCALE_FACTOR,
   };
   return drawingToolsObject;
 };
