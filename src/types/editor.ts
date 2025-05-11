@@ -1,3 +1,5 @@
+import { string } from "three/tsl";
+
 // Types
 export interface Wall {
   id: string;
@@ -17,6 +19,10 @@ export interface Floor {
   height: number;
   texture: string;
   roomId?: string;
+}
+
+export interface ObjectWithKeyStrings {
+  [key: string]: string;
 }
 
 export interface SelectedObject {

@@ -9,13 +9,6 @@ const useLevel = () => {
     null
   );
 
-  const textureColors = {
-    brickWall: "#a52a2a",
-    concreteFloor: "#cccccc",
-    woodFloor: "#d2b48c",
-    tileFloor: "#add8e6",
-  };
-
   const levelObject = {
     showRoomPicker,
     setShowRoomPicker,
@@ -25,7 +18,6 @@ const useLevel = () => {
     setSpawnPoint,
     startPoint,
     setStartPoint,
-    textureColors,
   };
 
   return levelObject;

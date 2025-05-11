@@ -7,8 +7,12 @@ import useSteps from "./hooks/useSteps";
 import useBlocks from "./hooks/useBlocks";
 import useLevel from "./hooks/useLevel";
 import useDrawingTools from "./hooks/useDrawingTools";
-import { GRID_SIZE, SCALE_FACTOR } from "./constants/constants";
-import Draw from "./classes/Draw";
+import {
+  GRID_SIZE,
+  SCALE_FACTOR,
+  TEXTURE_COLOURS,
+} from "./constants/constants";
+import Screen from "./classes/Screen";
 
 // Initial data
 
@@ -60,7 +64,6 @@ const FloorPlanEditor: React.FC = () => {
     setSpawnPoint,
     startPoint,
     setStartPoint,
-    textureColors,
   } = useLevel();
 
   const { enforceAngle, snapToGrid, showGrid, setShowGrid } = useDrawingTools();
@@ -90,14 +93,13 @@ const FloorPlanEditor: React.FC = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const screen = new Draw({
+    const screen = new Screen({
       canvas,
       floors,
       steps,
       blocks,
       walls,
       selectedObject,
-      textureColors,
       showGrid,
       tempStep,
       tempWall,
@@ -1175,7 +1177,9 @@ const FloorPlanEditor: React.FC = () => {
                       className="w-8 h-8 cursor-pointer border border-white"
                       style={{
                         backgroundColor:
-                          textureColors[texture as keyof typeof textureColors],
+                          TEXTURE_COLOURS[
+                            texture as keyof typeof TEXTURE_COLOURS
+                          ],
                         outline:
                           selectedObject.texture === texture
                             ? "2px solid yellow"

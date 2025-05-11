@@ -1,29 +1,37 @@
 import { GRID_SIZE } from "../constants/constants";
-import { Block, Floor, Step, Wall } from "../types/editor";
+import { TEXTURE_COLOURS } from "../constants/constants";
+import {
+  Block,
+  Floor,
+  ObjectWithKeyStrings,
+  SelectedObject,
+  SpawnPoint,
+  Step,
+  Wall,
+} from "../types/editor";
 
-export interface IDrawOptions {
+export interface IScreenOptions {
   canvas: HTMLCanvasElement;
   floors: Floor[];
   steps: Step[];
   blocks: Block[];
   walls: Wall[];
-  selectedObject;
-  textureColors;
-  showGrid;
-  tempStep;
-  tempWall;
-  tempBlock;
-  tempFloor;
-  spawnPoint;
+  selectedObject: SelectedObject | null;
+  showGrid: boolean;
+  tempStep: Step | null;
+  tempWall: Wall | null;
+  tempBlock: Block | null;
+  tempFloor: Floor | null;
+  spawnPoint: SpawnPoint | null;
 }
 
-export default class Draw {
+export default class Screen {
   private ctx;
-  private canvas: HTMLCanvasElement;
-  private floors: Floor[];
-  private steps: Step[];
-  private blocks: Block[];
-  private walls: Wall[];
+  private canvas;
+  private floors;
+  private steps;
+  private blocks;
+  private walls;
   private selectedObject;
   private textureColours;
   private showGrid;
@@ -40,19 +48,18 @@ export default class Draw {
     blocks,
     walls,
     selectedObject,
-    textureColors,
     showGrid,
     tempStep,
     tempWall,
     tempBlock,
     tempFloor,
     spawnPoint,
-  }: IDrawOptions) {
+  }: IScreenOptions) {
     this.canvas = canvas as HTMLCanvasElement;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
 
-    this.textureColours = textureColors;
+    this.textureColours = TEXTURE_COLOURS;
     this.selectedObject = selectedObject;
     this.showGrid = showGrid;
     this.tempStep = tempStep;
