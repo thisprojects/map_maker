@@ -3,7 +3,6 @@ import { TEXTURE_COLOURS } from "../constants/constants";
 import {
   Block,
   Floor,
-  ObjectWithKeyStrings,
   SelectedObject,
   SpawnPoint,
   Step,
