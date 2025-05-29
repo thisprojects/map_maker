@@ -6,8 +6,8 @@ interface IDetectCollisionOptions {
 }
 
 class DetectCollision {
-  private x: number;
-  private y: number;
+  public x: number;
+  public y: number;
 
   constructor({ x, y }: IDetectCollisionOptions) {
     this.x = x;

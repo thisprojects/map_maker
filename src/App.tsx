@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
 import useWalls from "./hooks/useWalls";
-import { Floor, SelectedObject, Wall, Step, Block } from "./types/editor";
+import { Floor, SelectedObject, Wall, Step, Block, Room } from "./types/editor";
 import useFloors from "./hooks/useFloors";
 import useSteps from "./hooks/useSteps";
 import useBlocks from "./hooks/useBlocks";
@@ -14,6 +14,8 @@ import {
 } from "./constants/constants";
 import Screen from "./classes/Screen";
 import DetectCollision from "./classes/DetectCollision";
+import useSelect from "./hooks/useSelect";
+import MakeExportedMap from "./classes/MakeExportedMap";
 
 // Initial data
 
@@ -25,6 +27,8 @@ const FloorPlanEditor: React.FC = () => {
     setTempWall,
     isDrawingWall,
     setIsDrawingWall,
+    addWall,
+    exportWalls,
   } = useWalls();
 
   const {
@@ -34,6 +38,9 @@ const FloorPlanEditor: React.FC = () => {
     setTempFloor,
     isDrawingFloor,
     setIsDrawingFloor,
+    makeFloor,
+    addFloor,
+    exportFloors,
   } = useFloors();
 
   const {
@@ -44,8 +51,14 @@ const FloorPlanEditor: React.FC = () => {
     isDrawingStep,
     setIsDrawingStep,
     stepRotation,
-    stepCount,
+    calcNormal,
+    drawSteps,
+    rotateSteps,
+    exportSteps,
   } = useSteps();
+
+  const { selectedObject, setSelectedObject, detectSelectorCollision } =
+    useSelect();
 
   const {
     setBlocks,
@@ -54,6 +67,9 @@ const FloorPlanEditor: React.FC = () => {
     tempBlock,
     isDrawingBlock,
     setIsDrawingBlock,
+    makeBlock,
+    addBlock,
+    exportBlocks,
   } = useBlocks();
 
   const {
@@ -71,10 +87,6 @@ const FloorPlanEditor: React.FC = () => {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(
-    null
-  );
 
   const [mode, setMode] = useState<
     | "select"
@@ -179,16 +191,9 @@ const FloorPlanEditor: React.FC = () => {
       // Snap coordinates to grid
       const { x, y } = snapToGrid(mouseX, mouseY);
 
-      const detectCollision = new DetectCollision({
-        x: mouseX,
-        y: mouseY,
-      });
-
       switch (mode) {
-        // Find the addStep case in the handleMouseDown function and replace it with this code
         case "addStep":
           if (!isDrawingStep) {
-            // Start drawing the step
             const escapeKeyHandler = (event: KeyboardEvent) => {
               if (
                 event.key === "Escape" ||
@@ -197,133 +202,35 @@ const FloorPlanEditor: React.FC = () => {
               ) {
                 setIsDrawingStep(false);
                 setTempStep(null);
-                console.log("Escape key was pressed - step creation canceled");
+
                 document.removeEventListener("keydown", escapeKeyHandler);
               }
             };
 
             document.addEventListener("keydown", escapeKeyHandler);
+            let normal = calcNormal(stepRotation);
 
-            // Calculate normal based on rotation
-            let normal;
-            switch (stepRotation) {
-              case 0: // North
-                normal = { x: 0, y: 1, z: 0 };
-                break;
-              case 1: // East
-                normal = { x: 1, y: 1, z: 0 };
-                break;
-              case 2: // South
-                normal = { x: 0, y: 1, z: 0 };
-                break;
-              case 3: // West
-                normal = { x: -1, y: 1, z: 0 };
-                break;
-              default:
-                normal = { x: 0, y: 1, z: 0 };
-            }
-
-            // Create the temporary step with all required properties
             const newTempStep = {
               id: "temp-step",
               x: x,
               y: -1, // Ground level
               z: y,
               width: GRID_SIZE,
-              depth: GRID_SIZE, // Fixed depth
+              depth: GRID_SIZE,
               height: 0.25,
               rotation: stepRotation,
-              texture: "woodFloor", // Using an existing texture
+              texture: "woodFloor",
               normal: normal,
             };
 
-            console.log("Creating temp step:", newTempStep); // Add this debug line
             setTempStep(newTempStep);
             setIsDrawingStep(true);
-
-            console.log("Step creation started - click again to place steps");
           } else {
-            // Finish drawing the step
-            console.log("Attempting to finalize step creation");
-
             if (tempStep) {
-              // Generate multiple steps
-              let newSteps = [];
-
-              let stepHeight = 1.5;
-
-              if (tempStep.rotation === 2) {
-                stepHeight = 0.25;
-              }
-
-              for (let i = 0; i < stepCount; i++) {
-                // Calculate the step position based on rotation
-                let stepX = tempStep.x; // Use the position of the temp step
-                let stepZ = tempStep.z;
-                const offset = (i * GRID_SIZE) / 7 + 7;
-                let width = 0;
-                let depth = 0;
-                let dir = 0;
-
-                switch (tempStep.rotation) {
-                  case 0: // North
-                    stepZ -= offset - GRID_SIZE / 2;
-                    width = GRID_SIZE;
-                    depth = 10;
-                    dir = 0;
-
-                    break;
-                  case 1: // East
-                    stepX += offset - GRID_SIZE / 2;
-                    width = 10;
-                    depth = GRID_SIZE;
-                    dir = 1;
-                    break;
-                  case 2: // South
-                    stepZ -= offset - GRID_SIZE / 2;
-                    width = GRID_SIZE;
-                    depth = 10;
-                    dir = 2;
-                    break;
-                  case 3: // West
-                    stepX -= offset - GRID_SIZE / 2;
-                    width = 10;
-                    depth = GRID_SIZE;
-                    dir = 3;
-                    break;
-                }
-
-                // Create a new step with decreasing height for each step
-                const newStep: Step = {
-                  id: `step-${Date.now()}-${i}`,
-                  x: stepX,
-                  y: -1, // Ground level
-                  z: stepZ,
-                  width: width,
-                  depth: depth, // Fixed depth
-                  height: stepHeight,
-                  rotation: 0,
-                  texture: "woodFloor", // Using an existing texture
-                  normal: tempStep.normal,
-                  dir,
-                  roomId: "1",
-                };
-
-                newSteps.push(newStep);
-
-                // decrease step height with each iteration
-                if (tempStep.rotation === 2) {
-                  stepHeight += 0.25;
-                } else {
-                  stepHeight -= 0.25;
-                }
-              }
-
-              console.log("Adding", newSteps.length, "new steps");
+              let newSteps = drawSteps(tempStep);
               setSteps((prevSteps) => [...prevSteps, ...newSteps]);
             }
 
-            // Reset drawing state
             setIsDrawingStep(false);
             setTempStep(null);
           }
@@ -331,7 +238,6 @@ const FloorPlanEditor: React.FC = () => {
 
         case "addBlock":
           if (!isDrawingBlock) {
-            // Start drawing the block
             const escapeKeyHandler = (event: KeyboardEvent) => {
               if (
                 event.key === "Escape" ||
@@ -341,16 +247,14 @@ const FloorPlanEditor: React.FC = () => {
                 setIsDrawingBlock(false);
                 setTempBlock(null);
                 setStartPoint(null);
-                console.log("Escape key was pressed - block creation canceled");
+
                 document.removeEventListener("keydown", escapeKeyHandler);
               }
             };
-
             document.addEventListener("keydown", escapeKeyHandler);
-
-            // Start drawing block
             setIsDrawingBlock(true);
             setStartPoint({ x, y });
+
             setTempBlock({
               id: "temp-block",
               x,
@@ -363,24 +267,11 @@ const FloorPlanEditor: React.FC = () => {
               texture: "woodFloor",
             });
           } else {
-            // Finish drawing the block
             setIsDrawingBlock(false);
 
             if (tempBlock && startPoint) {
-              // Only add block if it has some minimum size
               if (tempBlock.width > 20 && tempBlock.depth > 20) {
-                const newBlock: Block = {
-                  id: `block-${Date.now()}`,
-                  x: tempBlock.x,
-                  y: tempBlock.y,
-                  z: tempBlock.z,
-                  width: tempBlock.width,
-                  height: tempBlock.height,
-                  depth: tempBlock.depth,
-                  rotation: tempBlock.rotation,
-                  texture: "woodFloor",
-                  roomId: "1",
-                };
+                const newBlock: Block = makeBlock(tempBlock);
                 setBlocks([...blocks, newBlock]);
               }
             }
@@ -391,75 +282,19 @@ const FloorPlanEditor: React.FC = () => {
           break;
 
         case "select":
-          // Check if we clicked on a wall
-          let clickedObject = false;
+          const detectCollision = new DetectCollision({
+            x: mouseX,
+            y: mouseY,
+          });
 
-          for (const wall of walls) {
-            if (detectCollision.isPointOnWall(wall)) {
-              setSelectedObject({
-                id: wall.id,
-                type: "wall",
-                texture: wall.texture,
-                clickPoint: { x: mouseX, y: mouseY },
-                roomId: wall.roomId,
-              });
-              clickedObject = true;
-              break;
-            }
-          }
+          detectSelectorCollision({
+            walls,
+            detectCollision,
+            blocks,
+            floors,
+            steps,
+          });
 
-          if (!clickedObject) {
-            for (const step of steps) {
-              if (detectCollision.isPointOnStep(step)) {
-                setSelectedObject({
-                  id: step.id,
-                  type: "step",
-                  texture: step.texture,
-                  clickPoint: { x: mouseX, y: mouseY },
-                  roomId: step.roomId,
-                });
-                clickedObject = true;
-                break;
-              }
-            }
-          }
-
-          if (!clickedObject) {
-            for (const block of blocks) {
-              if (detectCollision.isPointOnBlock(block)) {
-                setSelectedObject({
-                  id: block.id,
-                  type: "block",
-                  texture: block.texture,
-                  clickPoint: { x: mouseX, y: mouseY },
-                  roomId: block.roomId,
-                });
-                clickedObject = true;
-                break;
-              }
-            }
-          }
-
-          if (!clickedObject) {
-            for (const floor of floors) {
-              if (detectCollision.isPointOnFloor(floor)) {
-                setSelectedObject({
-                  id: floor.id,
-                  type: "floor",
-                  texture: floor.texture,
-                  clickPoint: { x: mouseX, y: mouseY },
-                  roomId: floor.roomId,
-                });
-                clickedObject = true;
-                break;
-              }
-            }
-          }
-
-          // Clear selection if clicked on empty space
-          if (!clickedObject) {
-            setSelectedObject(null);
-          }
           break;
 
         case "addWall":
@@ -473,17 +308,14 @@ const FloorPlanEditor: React.FC = () => {
                 setIsDrawingWall(false);
                 setTempWall(null);
                 setStartPoint(null);
-                console.log("Escape key was pressed!");
 
                 document.removeEventListener("keydown", escapeKeyHandler);
-                console.log("Event listener removed");
               }
             };
-
             document.addEventListener("keydown", escapeKeyHandler);
-
             setIsDrawingWall(true);
             setStartPoint({ x, y });
+
             setTempWall({
               id: "temp-wall",
               x1: x,
@@ -493,11 +325,9 @@ const FloorPlanEditor: React.FC = () => {
               texture: "brickWall",
             });
           } else {
-            // Finish drawing the wall
             setIsDrawingWall(false);
 
             if (tempWall && startPoint) {
-              // Only add wall if it has some minimum length
               const length = Math.sqrt(
                 Math.pow(tempWall.x2 - tempWall.x1, 2) +
                   Math.pow(tempWall.y2 - tempWall.y1, 2)
@@ -523,7 +353,6 @@ const FloorPlanEditor: React.FC = () => {
           break;
         case "addFloor":
           if (!isDrawingFloor) {
-            // Setup escape key handler for canceling floor creation
             const escapeKeyHandler = (event: KeyboardEvent) => {
               if (
                 event.key === "Escape" ||
@@ -533,16 +362,14 @@ const FloorPlanEditor: React.FC = () => {
                 setIsDrawingFloor(false);
                 setTempFloor(null);
                 setStartPoint(null);
-                console.log("Escape key was pressed - floor creation canceled");
+
                 document.removeEventListener("keydown", escapeKeyHandler);
               }
             };
-
             document.addEventListener("keydown", escapeKeyHandler);
-
-            // Start drawing floor
             setIsDrawingFloor(true);
             setStartPoint({ x, y });
+
             setTempFloor({
               id: "temp-floor",
               x,
@@ -552,21 +379,11 @@ const FloorPlanEditor: React.FC = () => {
               texture: "concreteFloor",
             });
           } else {
-            // Finish drawing the floor
             setIsDrawingFloor(false);
 
             if (tempFloor && startPoint) {
-              // Only add floor if it has some minimum size
               if (tempFloor.width > 20 && tempFloor.height > 20) {
-                const newFloor: Floor = {
-                  id: `floor-${Date.now()}`,
-                  x: tempFloor.x,
-                  y: tempFloor.y,
-                  width: tempFloor.width,
-                  height: tempFloor.height,
-                  texture: "concreteFloor",
-                  roomId: "1",
-                };
+                const newFloor: Floor = makeFloor(tempFloor);
                 setFloors([...floors, newFloor]);
               }
             }
@@ -585,128 +402,59 @@ const FloorPlanEditor: React.FC = () => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
+      const { x, y } = snapToGrid(mouseX, mouseY);
 
-      if (mode === "addWall" && isDrawingWall && startPoint) {
-        // Get the snapped and angle-enforced end point
-        const endPoint = enforceAngle(
-          startPoint.x,
-          startPoint.y,
-          mouseX,
-          mouseY
-        );
+      if (startPoint) {
+        switch (mode) {
+          case "addWall":
+            if (isDrawingWall) {
+              addWall({
+                startPoint,
+                enforceAngle,
+                mouse: { x: mouseX, y: mouseY },
+              });
+            }
+            break;
 
-        setTempWall({
-          id: "temp-wall",
-          x1: startPoint.x,
-          y1: startPoint.y,
-          x2: endPoint.x,
-          y2: endPoint.y,
-          texture: "brickWall",
-        });
-      } else if (mode === "addFloor" && isDrawingFloor && startPoint) {
-        // Snap mouse coordinates to grid
-        const { x, y } = snapToGrid(mouseX, mouseY);
+          case "addFloor":
+            if (isDrawingFloor) {
+              addFloor({ startPoint, x, y });
+            }
+            break;
 
-        // Calculate width and height (ensure they're positive)
-        const width = Math.abs(x - startPoint.x);
-        const height = Math.abs(y - startPoint.y);
-
-        // Calculate the top-left corner of the rectangle
-        const floorX = Math.min(startPoint.x, x);
-        const floorY = Math.min(startPoint.y, y);
-
-        // Update temp floor
-        setTempFloor({
-          id: "temp-floor",
-          x: floorX,
-          y: floorY,
-          width,
-          height,
-          texture: "concreteFloor",
-        });
+          case "addBlock":
+            if (isDrawingBlock) {
+              addBlock({ startPoint, x, y });
+            }
+            break;
+        }
       } else if (mode === "addStep" && isDrawingStep && tempStep) {
-        // Snap mouse coordinates to grid
-        // const { x, y } = snapToGrid(mouseX, mouseY);
-
-        // Update temp step position
         setTempStep({
           ...tempStep,
           x: mouseX,
           z: mouseY,
         });
-      } else if (mode === "addBlock" && isDrawingBlock && startPoint) {
-        // Snap mouse coordinates to grid
-        const { x, y } = snapToGrid(mouseX, mouseY);
-
-        // Calculate width and depth (ensure they're positive)
-        const width = Math.abs(x - startPoint.x);
-        const depth = Math.abs(y - startPoint.y);
-
-        // Calculate the position of the block (center)
-        const blockX = (startPoint.x + x) / 2;
-        const blockZ = (startPoint.y + y) / 2;
-
-        // Update temp block
-        setTempBlock({
-          ...tempBlock!,
-          x: blockX,
-          z: blockZ,
-          width: width,
-          depth: depth,
-        });
       }
     };
 
-    const handleMouseWheel = (e: WheelEvent) => {
+    const handleRotateSteps = (e: WheelEvent) => {
       if (mode === "addStep" && isDrawingStep && tempStep) {
         e.preventDefault();
 
         // Determine rotation direction based on wheel delta
         const direction = e.deltaY > 0 ? 1 : -1;
-
-        // Calculate new rotation (0: North, 1: East, 2: South, 3: West)
-        // Using modulo to ensure the value stays in the range 0-3
-        let newRotation = (tempStep.rotation + direction + 4) % 4;
-
-        // Calculate normal based on new rotation
-        let normal;
-        switch (newRotation) {
-          case 0: // North
-            normal = { x: 0, y: 1, z: 0 };
-            break;
-          case 1: // East
-            normal = { x: 1, y: 1, z: 0 };
-            break;
-          case 2: // South
-            normal = { x: 0, y: 1, z: 0 };
-            break;
-          case 3: // West
-            normal = { x: -1, y: 1, z: 0 };
-            break;
-          default:
-            normal = { x: 0, y: 1, z: 0 };
-        }
-
-        // Make sure to preserve ALL properties of the tempStep
-        setTempStep({
-          ...tempStep,
-          rotation: newRotation,
-          normal: normal,
-        });
-
-        console.log("Rotated step to", newRotation * 90, "degrees");
-        console.log("Updated tempStep:", tempStep); // Debug
+        rotateSteps(mode, direction);
       }
     };
 
     canvas.addEventListener("mousedown", handleMouseDown);
     canvas.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("wheel", handleMouseWheel);
+    canvas.addEventListener("wheel", handleRotateSteps);
 
     return () => {
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("wheel", handleMouseWheel);
+      canvas.removeEventListener("wheel", handleRotateSteps);
     };
   }, [
     walls,
@@ -725,7 +473,6 @@ const FloorPlanEditor: React.FC = () => {
     isDrawingStep,
   ]);
 
-  // Update setModeAndResetDrawing function
   const setModeAndResetDrawing = (
     newMode:
       | "select"
@@ -753,7 +500,6 @@ const FloorPlanEditor: React.FC = () => {
     setShowGrid(!showGrid);
   };
 
-  // Function to change floor texture
   const changeFloorTexture = (floorId: string, newTexture: string) => {
     setFloors(
       floors.map((floor) =>
@@ -762,196 +508,30 @@ const FloorPlanEditor: React.FC = () => {
     );
   };
 
-  // Available floor textures
   const floorTextures = ["concreteFloor", "woodFloor", "tileFloor"];
 
   const saveMap = () => {
-    const roomList = rooms.map((room) => {
-      const roomWalls = walls.map((wall) => {
-        if (wall.roomId === room) {
-          let x,
-            y,
-            z,
-            width,
-            height,
-            rotation,
-            texture,
-            depth,
-            normal,
-            roomWall;
-
-          if (wall.x1 === wall.x2) {
-            // Vertical wall (West/East)
-            width = Math.abs(wall.y2 - wall.y1);
-            height = 5;
-            z = (wall.y2 + wall.y1) / 2;
-            x = wall.x1;
-            y = 0;
-            rotation = -Math.PI / 2; // flipped
-            texture = "west";
-            depth = 0;
-            normal = { x: -1, y: 0, z: 0 }; // flipped
-          } else if (wall.y1 === wall.y2) {
-            // Horizontal wall (North/South)
-            width = Math.abs(wall.x2 - wall.x1);
-            height = 5;
-            x = (wall.x2 + wall.x1) / 2;
-            z = wall.y1;
-            y = 0;
-            rotation = 0;
-            texture = "north";
-            depth = 0;
-            normal = { x: 0, y: 0, z: -1 }; // flipped
-          } else {
-            // Diagonal wall
-            const dx = wall.x2 - wall.x1;
-            const dy = wall.y2 - wall.y1;
-            const length = Math.sqrt(dx * dx + dy * dy);
-
-            width = length;
-            height = 5;
-            x = (wall.x1 + wall.x2) / 2;
-            z = (wall.y1 + wall.y2) / 2;
-            y = 0;
-
-            rotation = -Math.atan2(dy, dx); // flipped sign
-            texture = "diagonal";
-            depth = 0;
-
-            normal = {
-              x: dy / length, // flipped
-              y: 0,
-              z: -dx / length, // flipped
-            };
-          }
-
-          // Apply scaling to the 3D coordinates and dimensions
-          roomWall = {
-            x: x && x * SCALE_FACTOR,
-            y: y && y * SCALE_FACTOR,
-            z: z && z * SCALE_FACTOR,
-            width: width && width * SCALE_FACTOR,
-            height,
-            rotation,
-            texture,
-            depth: depth && depth * SCALE_FACTOR,
-            normal,
-          };
-
-          return roomWall;
-        }
-      });
-
-      const roomSteps = steps.map((step) => {
-        const roomStep = {
-          x: step.x * SCALE_FACTOR,
-          y: step.y,
-          z: step.z * SCALE_FACTOR,
-          width: step.width * SCALE_FACTOR,
-          depth: step.depth * SCALE_FACTOR,
-          height: step.height,
-          normal: step.normal,
-          rotation: step.rotation,
-          texture: "step",
-        };
-
-        return roomStep;
-      });
-
-      const roomBlocks = blocks
-        .map((block) => {
-          if (block.roomId === room) {
-            return {
-              x: block.x * SCALE_FACTOR,
-              y: block.y,
-              z: block.z * SCALE_FACTOR,
-              width: block.width * SCALE_FACTOR,
-              depth: block.depth * SCALE_FACTOR,
-              height: block.height,
-              rotation: block.rotation,
-              texture: "block",
-            };
-          }
-        })
-        .filter(Boolean);
-
-      const roomFloors = floors
-        .map((floor) => {
-          if (floor.roomId === room) {
-            // Correct the floor positioning, using the top-left corner
-            const x = floor.x + floor.width / 2; // This should center the floor on x
-            const z = floor.y + floor.height / 2; // This should center the floor on z
-            const y = -1; // Ground level (adjust as needed)
-
-            // Apply scaling to the coordinates and dimensions
-            return {
-              x: x * SCALE_FACTOR,
-              y: y,
-              z: z * SCALE_FACTOR,
-              width: floor.width * SCALE_FACTOR,
-              length: floor.height * SCALE_FACTOR,
-              texture: "floor",
-              rotation: -Math.PI / 2, // Correct rotation for the floor
-            };
-          }
-        })
-        .filter(Boolean);
+    const roomList: any = rooms.map((room) => {
+      const roomWalls = exportWalls(room);
+      const roomSteps = exportSteps();
+      const roomBlocks = exportBlocks(room);
+      const roomFloors = exportFloors(room);
 
       return {
-        walls: roomWalls.filter(Boolean),
+        walls: roomWalls,
         floors: roomFloors,
         steps: roomSteps,
         blocks: roomBlocks,
       };
     });
 
-    // Scale spawn point if it exists
-    const scaledSpawnPoint =
-      Object.keys(spawnPoint || []).length > 0
-        ? {
-            x: (spawnPoint as any).x * SCALE_FACTOR,
-            y: (spawnPoint as any).y * SCALE_FACTOR,
-            z: (spawnPoint as any).z * SCALE_FACTOR,
-            rotation: (spawnPoint as any).rotation,
-          }
-        : spawnPoint;
+    const exporter = new MakeExportedMap();
+    const exportObject = exporter.export(roomList, spawnPoint);
+    const savedMap = JSON.stringify(exportObject);
 
-    const savedMap = JSON.stringify({
-      name: "Level 1",
-      spawnPoint: scaledSpawnPoint,
-      textures: [
-        { type: "wall", name: "north", path: "FreeDoomWall1.png" },
-        { type: "wall", name: "south", path: "FreeDoomWall1.png" },
-        { type: "wall", name: "east", path: "FreeDoomWall2.png" },
-        { type: "wall", name: "west", path: "FreeDoomWall2.png" },
-        { type: "floor", name: "floor", path: "FreeDoomFloor1.png" },
-        { type: "block", name: "block", path: "FreeDoomFloor2.png" },
-      ],
-      rooms: roomList,
-      enemies: [],
-      entities: [
-        {
-          type: "player",
-          // Scale the entity positions too
-          position: { x: 2 * SCALE_FACTOR, y: 0, z: 2 * SCALE_FACTOR },
-          properties: { speed: 5, health: 100 },
-        },
-        {
-          type: "enemy",
-          // Scale the entity positions too
-          position: { x: 8 * SCALE_FACTOR, y: 0, z: 8 * SCALE_FACTOR },
-          properties: { ai: "patrol", damage: 10 },
-        },
-      ],
-    });
-
-    // Create a blob with the JSON data
     const blob = new Blob([savedMap], { type: "application/json" });
-
-    // Create a URL for the blob
     const url = URL.createObjectURL(blob);
 
-    // Create a temporary anchor element
     const link = document.createElement("a");
     link.href = url;
     link.download = "map";

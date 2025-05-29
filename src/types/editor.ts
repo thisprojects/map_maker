@@ -1,6 +1,38 @@
-import { string } from "three/tsl";
-
 // Types
+
+export interface Wall3D {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+  rotation: number;
+  texture: string;
+  depth: number;
+  normal: {
+    x: number;
+    y: number;
+    z: number;
+  };
+}
+
+export interface Floor3D {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  length: number;
+  texture: string;
+  rotation: number;
+}
+
+export interface Room {
+  walls: (Wall3D | undefined)[];
+  floors: (Floor3D | undefined)[];
+  steps: Step[];
+  blocks: (Block | undefined)[];
+}
+
 export interface Wall {
   id: string;
   x1: number;
