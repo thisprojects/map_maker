@@ -13,6 +13,7 @@ import {
   TEXTURE_COLOURS,
 } from "./constants/constants";
 import Screen from "./classes/Screen";
+import DetectCollision from "./classes/DetectCollision";
 
 // Initial data
 
@@ -170,77 +171,6 @@ const FloorPlanEditor: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Helper function to check if mouse is on a wall
-    const isPointOnWall = (x: number, y: number, wall: Wall): boolean => {
-      const lineWidth = 10; // Wall thickness
-
-      // Calculate perpendicular distance from point to line
-      const A = wall.y2 - wall.y1;
-      const B = wall.x1 - wall.x2;
-      const C = wall.x2 * wall.y1 - wall.x1 * wall.y2;
-
-      const distance = Math.abs(A * x + B * y + C) / Math.sqrt(A * A + B * B);
-
-      // Check if point is within line segment (not just the infinite line)
-      const minX = Math.min(wall.x1, wall.x2) - lineWidth;
-      const maxX = Math.max(wall.x1, wall.x2) + lineWidth;
-      const minY = Math.min(wall.y1, wall.y2) - lineWidth;
-      const maxY = Math.max(wall.y1, wall.y2) + lineWidth;
-
-      const withinBounds = x >= minX && x <= maxX && y >= minY && y <= maxY;
-
-      return distance <= lineWidth && withinBounds;
-    };
-
-    const isPointOnBlock = (x: number, y: number, block: Block): boolean => {
-      // Convert mouse coordinates to the local coordinate system of the rotated block
-      const dx = x - block.x;
-      const dy = y - block.z;
-
-      // Rotate the point in the opposite direction of the block's rotation
-      const angle = (-block.rotation * Math.PI) / 2;
-      const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
-      const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
-
-      // Check if the rotated point is within the block bounds
-      return (
-        rotatedX >= -block.width / 2 &&
-        rotatedX <= block.width / 2 &&
-        rotatedY >= -block.depth / 2 &&
-        rotatedY <= block.depth / 2
-      );
-    };
-
-    // Add a helper function to check if a point is on a step
-    const isPointOnStep = (x: number, y: number, step: Step): boolean => {
-      // Convert mouse coordinates to the local coordinate system of the rotated step
-      const dx = x - step.x;
-      const dy = y - step.z;
-
-      // Rotate the point in the opposite direction of the step's rotation
-      const angle = (-step.rotation * Math.PI) / 2;
-      const rotatedX = dx * Math.cos(angle) - dy * Math.sin(angle);
-      const rotatedY = dx * Math.sin(angle) + dy * Math.cos(angle);
-
-      // Check if the rotated point is within the step bounds
-      return (
-        rotatedX >= -step.width / 2 &&
-        rotatedX <= step.width / 2 &&
-        rotatedY >= -step.depth / 2 &&
-        rotatedY <= step.depth / 2
-      );
-    };
-
-    // Helper function to check if mouse is on a floor
-    const isPointOnFloor = (x: number, y: number, floor: Floor): boolean => {
-      return (
-        x >= floor.x &&
-        x <= floor.x + floor.width &&
-        y >= floor.y &&
-        y <= floor.y + floor.height
-      );
-    };
-
     const handleMouseDown = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -248,6 +178,11 @@ const FloorPlanEditor: React.FC = () => {
 
       // Snap coordinates to grid
       const { x, y } = snapToGrid(mouseX, mouseY);
+
+      const detectCollision = new DetectCollision({
+        x: mouseX,
+        y: mouseY,
+      });
 
       switch (mode) {
         // Find the addStep case in the handleMouseDown function and replace it with this code
@@ -460,7 +395,7 @@ const FloorPlanEditor: React.FC = () => {
           let clickedObject = false;
 
           for (const wall of walls) {
-            if (isPointOnWall(mouseX, mouseY, wall)) {
+            if (detectCollision.isPointOnWall(wall)) {
               setSelectedObject({
                 id: wall.id,
                 type: "wall",
@@ -475,7 +410,7 @@ const FloorPlanEditor: React.FC = () => {
 
           if (!clickedObject) {
             for (const step of steps) {
-              if (isPointOnStep(mouseX, mouseY, step)) {
+              if (detectCollision.isPointOnStep(step)) {
                 setSelectedObject({
                   id: step.id,
                   type: "step",
@@ -491,7 +426,7 @@ const FloorPlanEditor: React.FC = () => {
 
           if (!clickedObject) {
             for (const block of blocks) {
-              if (isPointOnBlock(mouseX, mouseY, block)) {
+              if (detectCollision.isPointOnBlock(block)) {
                 setSelectedObject({
                   id: block.id,
                   type: "block",
@@ -507,7 +442,7 @@ const FloorPlanEditor: React.FC = () => {
 
           if (!clickedObject) {
             for (const floor of floors) {
-              if (isPointOnFloor(mouseX, mouseY, floor)) {
+              if (detectCollision.isPointOnFloor(floor)) {
                 setSelectedObject({
                   id: floor.id,
                   type: "floor",
