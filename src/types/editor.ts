@@ -1,5 +1,14 @@
 // Types
 
+export type Modes =
+  | "select"
+  | "addWall"
+  | "addFloor"
+  | "addRoom"
+  | "spawnPoint"
+  | "addStep"
+  | "addBlock";
+
 export interface Wall3D {
   x: number;
   y: number;

@@ -164,6 +164,40 @@ const useSteps = () => {
         return roomStep;
       });
     },
+
+    drawTempSteps(x: number, y: number) {
+      const escapeKeyHandler = (event: KeyboardEvent) => {
+        if (
+          event.key === "Escape" ||
+          event.key === "Esc" ||
+          event.keyCode === 27
+        ) {
+          setIsDrawingStep(false);
+          setTempStep(null);
+
+          document.removeEventListener("keydown", escapeKeyHandler);
+        }
+      };
+
+      document.addEventListener("keydown", escapeKeyHandler);
+      let normal = stepsObject.calcNormal(stepsObject.stepRotation);
+
+      const newTempStep = {
+        id: "temp-step",
+        x: x,
+        y: -1, // Ground level
+        z: y,
+        width: GRID_SIZE,
+        depth: GRID_SIZE,
+        height: 0.25,
+        rotation: stepsObject.stepRotation,
+        texture: "woodFloor",
+        normal: normal,
+      };
+
+      setTempStep(newTempStep);
+      setIsDrawingStep(true);
+    },
   };
 
   return stepsObject;

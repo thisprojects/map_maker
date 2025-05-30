@@ -77,6 +77,38 @@ const useFloors = () => {
         })
         .filter(Boolean);
     },
+
+    drawTempFloor(
+      setStartPoint: (point: { x: number; y: number } | null) => void,
+      x: number,
+      y: number
+    ) {
+      const escapeKeyHandler = (event: KeyboardEvent) => {
+        if (
+          event.key === "Escape" ||
+          event.key === "Esc" ||
+          event.keyCode === 27
+        ) {
+          setIsDrawingFloor(false);
+          setTempFloor(null);
+          setStartPoint(null);
+
+          document.removeEventListener("keydown", escapeKeyHandler);
+        }
+      };
+      document.addEventListener("keydown", escapeKeyHandler);
+      setIsDrawingFloor(true);
+      setStartPoint({ x, y });
+
+      setTempFloor({
+        id: "temp-floor",
+        x,
+        y,
+        width: 0,
+        height: 0,
+        texture: "concreteFloor",
+      });
+    },
   };
   return floorsObject;
 };

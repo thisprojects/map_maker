@@ -124,6 +124,51 @@ const useWalls = () => {
         })
         .filter(Boolean);
     },
+
+    drawTempWall(
+      setStartPoint: (point: { x: number; y: number } | null) => void,
+      x: number,
+      y: number
+    ) {
+      const escapeKeyHandler = (event: KeyboardEvent) => {
+        if (
+          event.key === "Escape" ||
+          event.key === "Esc" ||
+          event.keyCode === 27
+        ) {
+          setIsDrawingWall(false);
+          setTempWall(null);
+          setStartPoint(null);
+
+          document.removeEventListener("keydown", escapeKeyHandler);
+        }
+      };
+      document.addEventListener("keydown", escapeKeyHandler);
+      setIsDrawingWall(true);
+      setStartPoint({ x, y });
+
+      setTempWall({
+        id: "temp-wall",
+        x1: x,
+        y1: y,
+        x2: x,
+        y2: y,
+        texture: "brickWall",
+      });
+    },
+
+    makeWall(startPoint: { x: number; y: number }) {
+      const tempWall = wallsObject.tempWall as Wall;
+      return {
+        id: `wall-${Date.now()}`,
+        x1: startPoint.x,
+        y1: startPoint.y,
+        x2: tempWall.x2,
+        y2: tempWall.y2,
+        texture: "brickWall",
+        roomId: "1",
+      };
+    },
   };
   return wallsObject;
 };

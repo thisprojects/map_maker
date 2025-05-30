@@ -73,6 +73,41 @@ const useBlocks = () => {
         })
         .filter(Boolean);
     },
+
+    drawTempblock(
+      setStartPoint: (point: { x: number; y: number } | null) => void,
+      x: number,
+      y: number
+    ) {
+      const escapeKeyHandler = (event: KeyboardEvent) => {
+        if (
+          event.key === "Escape" ||
+          event.key === "Esc" ||
+          event.keyCode === 27
+        ) {
+          setIsDrawingBlock(false);
+          setTempBlock(null);
+          setStartPoint(null);
+
+          document.removeEventListener("keydown", escapeKeyHandler);
+        }
+      };
+      document.addEventListener("keydown", escapeKeyHandler);
+      setIsDrawingBlock(true);
+      setStartPoint({ x, y });
+
+      setTempBlock({
+        id: "temp-block",
+        x,
+        y: 0, // Default height of 0
+        z: y,
+        width: 0,
+        height: 1, // Default thickness of 1
+        depth: 0,
+        rotation: 0,
+        texture: "woodFloor",
+      });
+    },
   };
 
   return blocksObject;
