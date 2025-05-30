@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./index.css";
 import useWalls from "./hooks/useWalls";
-import { Floor, Wall, Block } from "./types/editor";
+import { Floor, Wall, Block, Modes } from "./types/editor";
 import useFloors from "./hooks/useFloors";
 import useSteps from "./hooks/useSteps";
 import useBlocks from "./hooks/useBlocks";
@@ -13,8 +13,6 @@ import useSelect from "./hooks/useSelect";
 import Buttons from "./components/Buttons";
 import SelectedObjectTool from "./components/SelectedObjectTool";
 import DrawingTips from "./components/DrawringTips";
-
-// Initial data
 
 const FloorPlanEditor: React.FC = () => {
   const {
@@ -56,9 +54,6 @@ const FloorPlanEditor: React.FC = () => {
     drawTempSteps,
   } = useSteps();
 
-  const { selectedObject, setSelectedObject, detectSelectorCollision } =
-    useSelect();
-
   const {
     setBlocks,
     blocks,
@@ -84,21 +79,13 @@ const FloorPlanEditor: React.FC = () => {
     exportLevel,
   } = useLevel();
 
+  const { selectedObject, setSelectedObject, detectSelectorCollision } =
+    useSelect();
+
   const { enforceAngle, snapToGrid, showGrid, setShowGrid } = useDrawingTools();
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mode, setMode] = useState<Modes>("select");
 
-  const [mode, setMode] = useState<
-    | "select"
-    | "addWall"
-    | "addFloor"
-    | "addRoom"
-    | "spawnPoint"
-    | "addStep"
-    | "addBlock"
-  >("select");
-
-  // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -121,35 +108,22 @@ const FloorPlanEditor: React.FC = () => {
       spawnPoint,
     });
 
-    // Initial draw
     screen.draw();
-
-    // Set up animation loop with proper timing
     let lastFrameTime = 0;
     const targetFPS = 30; // Adjust this value as needed (lower = less CPU usage)
     const frameInterval = 1000 / targetFPS;
 
     const animate = (timestamp: number) => {
-      // Calculate time elapsed since last frame
       const elapsed = timestamp - lastFrameTime;
 
-      // Only render if enough time has passed
       if (elapsed > frameInterval) {
-        // Update last frame time, accounting for any excess time
         lastFrameTime = timestamp - (elapsed % frameInterval);
-
-        // Perform drawing operation
         screen.draw();
       }
-
-      // Schedule next frame
       requestAnimationFrame(animate);
     };
-
-    // Start animation loop
     requestAnimationFrame(animate);
 
-    // Handle window resize
     const handleResize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -178,7 +152,6 @@ const FloorPlanEditor: React.FC = () => {
     tempBlock,
   ]);
 
-  // Handle mouse events
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
